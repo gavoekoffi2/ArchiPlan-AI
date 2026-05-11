@@ -140,6 +140,7 @@ canvas{display:block}
   <div class="skeleton"></div>
   <div class="loading-text" id="loading-text">Chargement...</div>
   <div class="loading-sub" id="loading-sub">Préparation de l'environnement 3D</div>
+  <div style="font-size:9px;color:var(--t2);margin-top:20px;opacity:.5">v2.1 — bugs corrigés</div>
   <div class="loading-progress"><span></span><span></span><span></span></div>
 </div>
 
@@ -565,6 +566,10 @@ function setMode(m) {
   document.getElementById('btn-walk').classList.toggle('active', m === 'walk');
 
   if (m === 'walk') {
+    // Sauvegarde l'état Orbite AVANT d'entrer en Visite
+    state._savedOrbitTarget = state.controls.target.clone();
+    state._savedCameraPos = state.camera.position.clone();
+    state._savedCameraQuat = state.camera.quaternion.clone();
     state.isWalkMode = true;
     state.controls.enabled = false;
     document.getElementById('walk-hint').style.display = 'block';
@@ -581,16 +586,21 @@ function setMode(m) {
     state.renderer.domElement.requestPointerLock();
   } else {
     state.isWalkMode = false;
-    state.controls.enabled = true;
+    document.exitPointerLock();
     document.getElementById('walk-hint').style.display = 'none';
     document.getElementById('minimap').style.display = 'none';
-    document.exitPointerLock();
-    if (state.modelData) {
+    // Restaure l'état Orbite sauvegardé
+    if (state._savedOrbitTarget) {
+      state.controls.target.copy(state._savedOrbitTarget);
+      state.camera.position.copy(state._savedCameraPos);
+      state.camera.quaternion.copy(state._savedCameraQuat);
+    } else if (state.modelData) {
       const meta = state.modelData.metadata || {};
       const tw = meta.total_width || 10, td = meta.total_depth || 8;
       state.camera.position.set(tw/2, Math.max(tw,td)*0.7, td*1.3);
       state.controls.target.set(tw/2, 0, td/2);
     }
+    state.controls.enabled = true;
     state.controls.update();
   }
 }
@@ -1093,7 +1103,17 @@ function focusRoom(room) {
   })(t0);
 }
 
-window.toggleSidebar = () => document.getElementById('sidebar').classList.toggle('hidden');
+window.toggleSidebar = () => {
+  const sidebar = document.getElementById('sidebar');
+  const btn = document.querySelector('#toolbar .tool[data-tooltip="Pièces & infos"]');
+  if (sidebar.classList.contains('hidden')) {
+    sidebar.classList.remove('hidden');
+    if (btn) btn.classList.add('active');
+  } else {
+    sidebar.classList.add('hidden');
+    if (btn) btn.classList.remove('active');
+  }
+};
 window.toggleFurniturePanel = () => {
   document.getElementById('furniture-panel').classList.toggle('hidden');
   document.getElementById('btn-furniture').classList.toggle('active');
@@ -1352,7 +1372,11 @@ window.closeModal = id => document.getElementById(id).classList.remove('show');
 // ─── UI helpers ───
 function showUI() {
   document.getElementById('toolbar').classList.remove('hidden');
-  document.getElementById('sidebar').classList.remove('hidden');
+  const sidebar = document.getElementById('sidebar');
+  sidebar.classList.remove('hidden');
+  // Sync bouton toolbar
+  const btn = document.querySelector('#toolbar .tool[data-tooltip="Pièces & infos"]');
+  if (btn) btn.classList.add('active');
   document.getElementById('bottombar').classList.remove('hidden');
   updateFurnitureCount();
 }

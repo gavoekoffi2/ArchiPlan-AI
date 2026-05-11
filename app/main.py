@@ -825,6 +825,17 @@ def model_to_obj(model: dict) -> str:
 
 
 # ─── STATIC FILES ───────────────────────────────────────────────────
+# Middleware anti-cache pour éviter que le navigateur garde l'ancienne version
+@app.middleware("http")
+async def add_no_cache_headers(request: Request, call_next):
+    response = await call_next(request)
+    # Pas de cache pour les fichiers HTML (force le rechargement)
+    if request.url.path == "/" or request.url.path.endswith(".html"):
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
+
 app.mount("/", StaticFiles(directory=str(STATIC), html=True), name="static")
 
 

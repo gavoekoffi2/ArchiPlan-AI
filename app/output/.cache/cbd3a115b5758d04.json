@@ -1,0 +1,202 @@
+{
+  "rooms": [
+    {
+      "name": "Bureau 2",
+      "type": "office",
+      "x": 0.0,
+      "z": 0.0,
+      "width": 4.0,
+      "depth": 3.0
+    },
+    {
+      "name": "Bureau 3",
+      "type": "office",
+      "x": 4.0,
+      "z": 0.0,
+      "width": 4.0,
+      "depth": 3.0
+    },
+    {
+      "name": "Bureau 4",
+      "type": "office",
+      "x": 8.0,
+      "z": 0.0,
+      "width": 4.0,
+      "depth": 3.0
+    },
+    {
+      "name": "Bureau 1",
+      "type": "office",
+      "x": 0.0,
+      "z": 3.0,
+      "width": 4.0,
+      "depth": 3.0
+    },
+    {
+      "name": "Entrée",
+      "type": "entrance",
+      "x": 0.0,
+      "z": 6.0,
+      "width": 4.0,
+      "depth": 3.0
+    },
+    {
+      "name": "Bureau 7",
+      "type": "office",
+      "x": 0.0,
+      "z": 9.0,
+      "width": 4.0,
+      "depth": 3.0
+    },
+    {
+      "name": "Bureau 6",
+      "type": "office",
+      "x": 4.0,
+      "z": 9.0,
+      "width": 4.0,
+      "depth": 3.0
+    },
+    {
+      "name": "Bureau 5",
+      "type": "office",
+      "x": 8.0,
+      "z": 9.0,
+      "width": 4.0,
+      "depth": 3.0
+    },
+    {
+      "name": "WC",
+      "type": "wc",
+      "x": 8.0,
+      "z": 3.0,
+      "width": 2.0,
+      "depth": 1.5
+    },
+    {
+      "name": "WC",
+      "type": "wc",
+      "x": 8.0,
+      "z": 4.5,
+      "width": 2.0,
+      "depth": 1.5
+    },
+    {
+      "name": "Stairs",
+      "type": "other",
+      "x": 8.0,
+      "z": 6.0,
+      "width": 4.0,
+      "depth": 3.0
+    }
+  ],
+  "walls": [
+    {
+      "x1": 0,
+      "z1": 0,
+      "x2": 12,
+      "z2": 0
+    },
+    {
+      "x1": 12,
+      "z1": 0,
+      "x2": 12,
+      "z2": 12
+    },
+    {
+      "x1": 12,
+      "z1": 12,
+      "x2": 0,
+      "z2": 12
+    },
+    {
+      "x1": 0,
+      "z1": 12,
+      "x2": 0,
+      "z2": 0
+    },
+    {
+      "x1": 4,
+      "z1": 0,
+      "x2": 4,
+      "z2": 6
+    },
+    {
+      "x1": 8,
+      "z1": 0,
+      "x2": 8,
+      "z2": 6
+    },
+    {
+      "x1": 4,
+      "z1": 9,
+      "x2": 4,
+      "z2": 12
+    },
+    {
+      "x1": 8,
+      "z1": 9,
+      "x2": 8,
+      "z2": 12
+    },
+    {
+      "x1": 8,
+      "z1": 3,
+      "x2": 8,
+      "z2": 6
+    }
+  ],
+  "doors": [
+    {
+      "x": 3.5,
+      "z": 3,
+      "rotation": 1.5708,
+      "width": 0.8
+    },
+    {
+      "x": 7.5,
+      "z": 3,
+      "rotation": 1.5708,
+      "width": 0.8
+    },
+    {
+      "x": 3.5,
+      "z": 9,
+      "rotation": 1.5708,
+      "width": 0.8
+    },
+    {
+      "x": 7.5,
+      "z": 9,
+      "rotation": 1.5708,
+      "width": 0.8
+    },
+    {
+      "x": 3.5,
+      "z": 6,
+      "rotation": 1.5708,
+      "width": 0.8
+    },
+    {
+      "x": 4,
+      "z": 3,
+      "rotation": 0,
+      "width": 0.8
+    },
+    {
+      "x": 4,
+      "z": 0,
+      "rotation": 0,
+      "width": 0.8
+    }
+  ],
+  "windows": [],
+  "total_width": 12.0,
+  "total_depth": 12.0,
+  "scale_detected": false,
+  "orientation": "N",
+  "floor_count": 1,
+  "_meta": {
+    "source": "google/gemini-2.0-flash-001",
+    "hash": "cbd3a115b5758d04"
+  }
+}
