@@ -1,0 +1,339 @@
+{
+  "metadata": {
+    "total_width": 12,
+    "total_depth": 10,
+    "wall_height": 2.7,
+    "units": "meters"
+  },
+  "rooms": [
+    {
+      "name": "BUREAU 1",
+      "x": 0,
+      "z": 3,
+      "width": 4,
+      "depth": 4,
+      "color": "#f4a460"
+    },
+    {
+      "name": "BUREAU 2",
+      "x": 1,
+      "z": 0,
+      "width": 3,
+      "depth": 2.5,
+      "color": "#7ec850"
+    },
+    {
+      "name": "BUREAU 3",
+      "x": 4.5,
+      "z": 0,
+      "width": 3,
+      "depth": 2.5,
+      "color": "#68a0d8"
+    },
+    {
+      "name": "BUREAU 4",
+      "x": 8,
+      "z": 0,
+      "width": 4,
+      "depth": 3,
+      "color": "#c080d0"
+    },
+    {
+      "name": "BUREAU 5",
+      "x": 8,
+      "z": 4,
+      "width": 4,
+      "depth": 3,
+      "color": "#50c8b8"
+    },
+    {
+      "name": "BUREAU 6",
+      "x": 4.5,
+      "z": 7.5,
+      "width": 3,
+      "depth": 2.5,
+      "color": "#e8a040"
+    },
+    {
+      "name": "BUREAU 7",
+      "x": 1,
+      "z": 7.5,
+      "width": 3,
+      "depth": 2.5,
+      "color": "#60b880"
+    },
+    {
+      "name": "ENTREE",
+      "x": 0,
+      "z": 7,
+      "width": 4,
+      "depth": 3,
+      "color": "#5890d0"
+    },
+    {
+      "name": "WC",
+      "x": 10,
+      "z": 3,
+      "width": 2,
+      "depth": 1,
+      "color": "#b870c8"
+    },
+    {
+      "name": "Escalier",
+      "x": 8,
+      "z": 3,
+      "width": 2,
+      "depth": 1,
+      "color": "#48b8a8"
+    }
+  ],
+  "walls": [
+    {
+      "x": 6.0,
+      "z": 0.0,
+      "length": 12.0,
+      "height": 2.7,
+      "thickness": 0.15,
+      "rotation": 0.0
+    },
+    {
+      "x": 12.0,
+      "z": 5.0,
+      "length": 10.0,
+      "height": 2.7,
+      "thickness": 0.15,
+      "rotation": 1.5708
+    },
+    {
+      "x": 6.0,
+      "z": 10.0,
+      "length": 12.0,
+      "height": 2.7,
+      "thickness": 0.15,
+      "rotation": 3.1416
+    },
+    {
+      "x": 0.0,
+      "z": 5.0,
+      "length": 10.0,
+      "height": 2.7,
+      "thickness": 0.15,
+      "rotation": -1.5708
+    },
+    {
+      "x": 4.0,
+      "z": 5.0,
+      "length": 4.0,
+      "height": 2.7,
+      "thickness": 0.15,
+      "rotation": 1.5708
+    },
+    {
+      "x": 4.25,
+      "z": 2.5,
+      "length": 6.5,
+      "height": 2.7,
+      "thickness": 0.15,
+      "rotation": 0.0
+    },
+    {
+      "x": 4.5,
+      "z": 1.25,
+      "length": 2.5,
+      "height": 2.7,
+      "thickness": 0.15,
+      "rotation": -1.5708
+    },
+    {
+      "x": 8.0,
+      "z": 3.5,
+      "length": 7.0,
+      "height": 2.7,
+      "thickness": 0.15,
+      "rotation": 1.5708
+    },
+    {
+      "x": 10.0,
+      "z": 7.5,
+      "length": 4.0,
+      "height": 2.7,
+      "thickness": 0.15,
+      "rotation": 0.0
+    },
+    {
+      "x": 4.5,
+      "z": 8.75,
+      "length": 2.5,
+      "height": 2.7,
+      "thickness": 0.15,
+      "rotation": 1.5708
+    },
+    {
+      "x": 10.0,
+      "z": 3.5,
+      "length": 1.0,
+      "height": 2.7,
+      "thickness": 0.15,
+      "rotation": 1.5708
+    }
+  ],
+  "doors": [
+    {
+      "x": 2,
+      "z": 3,
+      "y": 1.05,
+      "width": 0.9,
+      "height": 2.1,
+      "rotation": 0,
+      "color": "#8B7355"
+    },
+    {
+      "x": 2.5,
+      "z": 2.5,
+      "y": 1.05,
+      "width": 0.9,
+      "height": 2.1,
+      "rotation": 90,
+      "color": "#8B7355"
+    },
+    {
+      "x": 6,
+      "z": 2.5,
+      "y": 1.05,
+      "width": 0.9,
+      "height": 2.1,
+      "rotation": 90,
+      "color": "#8B7355"
+    },
+    {
+      "x": 9,
+      "z": 3,
+      "y": 1.05,
+      "width": 0.9,
+      "height": 2.1,
+      "rotation": 0,
+      "color": "#8B7355"
+    },
+    {
+      "x": 9,
+      "z": 7,
+      "y": 1.05,
+      "width": 0.9,
+      "height": 2.1,
+      "rotation": 0,
+      "color": "#8B7355"
+    },
+    {
+      "x": 6,
+      "z": 7.5,
+      "y": 1.05,
+      "width": 0.9,
+      "height": 2.1,
+      "rotation": 90,
+      "color": "#8B7355"
+    },
+    {
+      "x": 2.5,
+      "z": 7.5,
+      "y": 1.05,
+      "width": 0.9,
+      "height": 2.1,
+      "rotation": 90,
+      "color": "#8B7355"
+    },
+    {
+      "x": 10,
+      "z": 3.5,
+      "y": 1.05,
+      "width": 0.9,
+      "height": 2.1,
+      "rotation": 90,
+      "color": "#8B7355"
+    },
+    {
+      "x": 0,
+      "z": 8.5,
+      "y": 1.05,
+      "width": 0.9,
+      "height": 2.1,
+      "rotation": 90,
+      "color": "#8B7355"
+    }
+  ],
+  "windows": [
+    {
+      "x": 2,
+      "z": 0,
+      "y": 1.2,
+      "width": 1.2,
+      "height": 1.2,
+      "rotation": 0
+    },
+    {
+      "x": 6,
+      "z": 0,
+      "y": 1.2,
+      "width": 1.2,
+      "height": 1.2,
+      "rotation": 0
+    },
+    {
+      "x": 10,
+      "z": 0,
+      "y": 1.2,
+      "width": 1.2,
+      "height": 1.2,
+      "rotation": 0
+    },
+    {
+      "x": 12,
+      "z": 5,
+      "y": 1.2,
+      "width": 1.2,
+      "height": 1.2,
+      "rotation": 90
+    },
+    {
+      "x": 6,
+      "z": 10,
+      "y": 1.2,
+      "width": 1.2,
+      "height": 1.2,
+      "rotation": 0
+    },
+    {
+      "x": 2,
+      "z": 10,
+      "y": 1.2,
+      "width": 1.2,
+      "height": 1.2,
+      "rotation": 0
+    },
+    {
+      "x": 0,
+      "z": 5,
+      "y": 1.2,
+      "width": 1.2,
+      "height": 1.2,
+      "rotation": 90
+    }
+  ],
+  "floor": {
+    "width": 12,
+    "depth": 10,
+    "y": 0,
+    "color": "#d4c5b2"
+  },
+  "camera": {
+    "position": {
+      "x": 6.0,
+      "y": 8,
+      "z": 5.0
+    },
+    "lookAt": {
+      "x": 6.0,
+      "y": 0,
+      "z": 5.0
+    }
+  }
+}

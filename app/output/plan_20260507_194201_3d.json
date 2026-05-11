@@ -1,0 +1,231 @@
+{
+  "metadata": {
+    "total_width": 10,
+    "total_depth": 8,
+    "wall_height": 2.7,
+    "units": "meters"
+  },
+  "rooms": [
+    {
+      "name": "Salon",
+      "x": 0,
+      "z": 0,
+      "width": 5,
+      "depth": 5,
+      "color": "#f4a460"
+    },
+    {
+      "name": "Cuisine",
+      "x": 5,
+      "z": 0,
+      "width": 3,
+      "depth": 5,
+      "color": "#7ec850"
+    },
+    {
+      "name": "Chambre 1",
+      "x": 0,
+      "z": 5,
+      "width": 4,
+      "depth": 3,
+      "color": "#68a0d8"
+    },
+    {
+      "name": "Chambre 2",
+      "x": 4,
+      "z": 5,
+      "width": 4,
+      "depth": 3,
+      "color": "#c080d0"
+    },
+    {
+      "name": "SDB",
+      "x": 8,
+      "z": 0,
+      "width": 2,
+      "depth": 3,
+      "color": "#50c8b8"
+    }
+  ],
+  "walls": [
+    {
+      "x": 5.0,
+      "z": 0.075,
+      "length": 10,
+      "height": 2.7,
+      "thickness": 0.15,
+      "rotation": 0
+    },
+    {
+      "x": 5.0,
+      "z": 7.925,
+      "length": 10,
+      "height": 2.7,
+      "thickness": 0.15,
+      "rotation": 0
+    },
+    {
+      "x": 0.075,
+      "z": 4.0,
+      "length": 8,
+      "height": 2.7,
+      "thickness": 0.15,
+      "rotation": 1.5708
+    },
+    {
+      "x": 9.925,
+      "z": 4.0,
+      "length": 8,
+      "height": 2.7,
+      "thickness": 0.15,
+      "rotation": 1.5708
+    },
+    {
+      "x": 5,
+      "z": 2.5,
+      "length": 5,
+      "height": 2.7,
+      "thickness": 0.15,
+      "rotation": 1.5708
+    },
+    {
+      "x": 2.5,
+      "z": 5,
+      "length": 5,
+      "height": 2.7,
+      "thickness": 0.15,
+      "rotation": 0
+    },
+    {
+      "x": 4.0,
+      "z": 5,
+      "length": 8,
+      "height": 2.7,
+      "thickness": 0.15,
+      "rotation": 0
+    },
+    {
+      "x": 8,
+      "z": 2.5,
+      "length": 5,
+      "height": 2.7,
+      "thickness": 0.15,
+      "rotation": 1.5708
+    },
+    {
+      "x": 6.0,
+      "z": 5,
+      "length": 4,
+      "height": 2.7,
+      "thickness": 0.15,
+      "rotation": 0
+    },
+    {
+      "x": 4,
+      "z": 6.5,
+      "length": 3,
+      "height": 2.7,
+      "thickness": 0.15,
+      "rotation": 1.5708
+    }
+  ],
+  "doors": [
+    {
+      "x": 4.55,
+      "z": 0,
+      "y": 1.05,
+      "width": 0.9,
+      "height": 2.1,
+      "rotation": 0,
+      "color": "#8B7355"
+    },
+    {
+      "x": 5.45,
+      "z": 0,
+      "y": 1.05,
+      "width": 0.9,
+      "height": 2.1,
+      "rotation": 0,
+      "color": "#8B7355"
+    },
+    {
+      "x": 0,
+      "z": 2.3,
+      "y": 1.05,
+      "width": 0.9,
+      "height": 2.1,
+      "rotation": 1.57,
+      "color": "#8B7355"
+    },
+    {
+      "x": 7,
+      "z": 5,
+      "y": 1.05,
+      "width": 0.9,
+      "height": 2.1,
+      "rotation": 0,
+      "color": "#8B7355"
+    },
+    {
+      "x": 8,
+      "z": 1.5,
+      "y": 1.05,
+      "width": 0.9,
+      "height": 2.1,
+      "rotation": 1.57,
+      "color": "#8B7355"
+    }
+  ],
+  "windows": [
+    {
+      "x": 1.5,
+      "z": 0,
+      "y": 1.2,
+      "width": 1.5,
+      "height": 1.2,
+      "rotation": 0
+    },
+    {
+      "x": 3.5,
+      "z": 5,
+      "y": 1.2,
+      "width": 1.2,
+      "height": 1.2,
+      "rotation": 1.57
+    },
+    {
+      "x": 0,
+      "z": 1.5,
+      "y": 1.2,
+      "width": 1.2,
+      "height": 1.2,
+      "rotation": 1.57
+    },
+    {
+      "x": 5.5,
+      "z": 0,
+      "y": 1.2,
+      "width": 1.2,
+      "height": 1.2,
+      "rotation": 0
+    }
+  ],
+  "floor": {
+    "width": 10,
+    "depth": 8,
+    "y": 0,
+    "color": "#d4c5b2"
+  },
+  "camera": {
+    "position": {
+      "x": 5.0,
+      "y": 8,
+      "z": 4.0
+    },
+    "lookAt": {
+      "x": 5.0,
+      "y": 0,
+      "z": 4.0
+    }
+  }
+}

@@ -1,0 +1,361 @@
+{
+  "metadata": {
+    "total_width": 12,
+    "total_depth": 12,
+    "wall_height": 2.7,
+    "units": "meters"
+  },
+  "rooms": [
+    {
+      "name": "BUREAU 2",
+      "x": 0,
+      "z": 0,
+      "width": 4,
+      "depth": 3,
+      "color": "#f4a460"
+    },
+    {
+      "name": "BUREAU 3",
+      "x": 4,
+      "z": 0,
+      "width": 4,
+      "depth": 3,
+      "color": "#7ec850"
+    },
+    {
+      "name": "BUREAU 4",
+      "x": 8,
+      "z": 0,
+      "width": 4,
+      "depth": 3,
+      "color": "#68a0d8"
+    },
+    {
+      "name": "BUREAU 1",
+      "x": 0,
+      "z": 3,
+      "width": 4,
+      "depth": 3,
+      "color": "#c080d0"
+    },
+    {
+      "name": "ENTR\u00c9E",
+      "x": 0,
+      "z": 6,
+      "width": 4,
+      "depth": 3,
+      "color": "#50c8b8"
+    },
+    {
+      "name": "BUREAU 7",
+      "x": 0,
+      "z": 9,
+      "width": 4,
+      "depth": 3,
+      "color": "#e8a040"
+    },
+    {
+      "name": "BUREAU 6",
+      "x": 4,
+      "z": 9,
+      "width": 4,
+      "depth": 3,
+      "color": "#60b880"
+    },
+    {
+      "name": "BUREAU 5",
+      "x": 8,
+      "z": 9,
+      "width": 4,
+      "depth": 3,
+      "color": "#5890d0"
+    },
+    {
+      "name": "WC",
+      "x": 8,
+      "z": 3,
+      "width": 2,
+      "depth": 1.5,
+      "color": "#b870c8"
+    },
+    {
+      "name": "WC",
+      "x": 8,
+      "z": 4.5,
+      "width": 2,
+      "depth": 1.5,
+      "color": "#48b8a8"
+    }
+  ],
+  "walls": [
+    {
+      "x": 2.0,
+      "z": 0.0,
+      "length": 4.0,
+      "height": 2.7,
+      "thickness": 0.15,
+      "rotation": 0.0
+    },
+    {
+      "x": 6.0,
+      "z": 0.0,
+      "length": 4.0,
+      "height": 2.7,
+      "thickness": 0.15,
+      "rotation": 0.0
+    },
+    {
+      "x": 10.0,
+      "z": 0.0,
+      "length": 4.0,
+      "height": 2.7,
+      "thickness": 0.15,
+      "rotation": 0.0
+    },
+    {
+      "x": 12.0,
+      "z": 1.5,
+      "length": 3.0,
+      "height": 2.7,
+      "thickness": 0.15,
+      "rotation": 1.5708
+    },
+    {
+      "x": 12.0,
+      "z": 4.5,
+      "length": 3.0,
+      "height": 2.7,
+      "thickness": 0.15,
+      "rotation": 1.5708
+    },
+    {
+      "x": 12.0,
+      "z": 7.5,
+      "length": 3.0,
+      "height": 2.7,
+      "thickness": 0.15,
+      "rotation": 1.5708
+    },
+    {
+      "x": 12.0,
+      "z": 10.5,
+      "length": 3.0,
+      "height": 2.7,
+      "thickness": 0.15,
+      "rotation": 1.5708
+    },
+    {
+      "x": 10.0,
+      "z": 12.0,
+      "length": 4.0,
+      "height": 2.7,
+      "thickness": 0.15,
+      "rotation": 0.0
+    },
+    {
+      "x": 6.0,
+      "z": 12.0,
+      "length": 4.0,
+      "height": 2.7,
+      "thickness": 0.15,
+      "rotation": 0.0
+    },
+    {
+      "x": 2.0,
+      "z": 12.0,
+      "length": 4.0,
+      "height": 2.7,
+      "thickness": 0.15,
+      "rotation": 0.0
+    },
+    {
+      "x": 0.0,
+      "z": 10.5,
+      "length": 3.0,
+      "height": 2.7,
+      "thickness": 0.15,
+      "rotation": 1.5708
+    },
+    {
+      "x": 0.0,
+      "z": 7.5,
+      "length": 3.0,
+      "height": 2.7,
+      "thickness": 0.15,
+      "rotation": 1.5708
+    },
+    {
+      "x": 0.0,
+      "z": 4.5,
+      "length": 3.0,
+      "height": 2.7,
+      "thickness": 0.15,
+      "rotation": 1.5708
+    },
+    {
+      "x": 0.0,
+      "z": 1.5,
+      "length": 3.0,
+      "height": 2.7,
+      "thickness": 0.15,
+      "rotation": 1.5708
+    },
+    {
+      "x": 4.0,
+      "z": 1.5,
+      "length": 3.0,
+      "height": 2.7,
+      "thickness": 0.15,
+      "rotation": 1.5708
+    },
+    {
+      "x": 8.0,
+      "z": 1.5,
+      "length": 3.0,
+      "height": 2.7,
+      "thickness": 0.15,
+      "rotation": 1.5708
+    },
+    {
+      "x": 4.0,
+      "z": 4.5,
+      "length": 3.0,
+      "height": 2.7,
+      "thickness": 0.15,
+      "rotation": 1.5708
+    },
+    {
+      "x": 8.0,
+      "z": 4.5,
+      "length": 3.0,
+      "height": 2.7,
+      "thickness": 0.15,
+      "rotation": 1.5708
+    },
+    {
+      "x": 4.0,
+      "z": 10.5,
+      "length": 3.0,
+      "height": 2.7,
+      "thickness": 0.15,
+      "rotation": 1.5708
+    },
+    {
+      "x": 8.0,
+      "z": 10.5,
+      "length": 3.0,
+      "height": 2.7,
+      "thickness": 0.15,
+      "rotation": 1.5708
+    },
+    {
+      "x": 9.0,
+      "z": 3.0,
+      "length": 2.0,
+      "height": 2.7,
+      "thickness": 0.15,
+      "rotation": 0.0
+    },
+    {
+      "x": 9.0,
+      "z": 4.5,
+      "length": 2.0,
+      "height": 2.7,
+      "thickness": 0.15,
+      "rotation": 0.0
+    }
+  ],
+  "doors": [
+    {
+      "x": 3.5,
+      "z": 3,
+      "y": 1.05,
+      "width": 0.9,
+      "height": 2.1,
+      "rotation": 90,
+      "color": "#8B7355"
+    },
+    {
+      "x": 3.5,
+      "z": 6,
+      "y": 1.05,
+      "width": 0.9,
+      "height": 2.1,
+      "rotation": 90,
+      "color": "#8B7355"
+    },
+    {
+      "x": 3.5,
+      "z": 9,
+      "y": 1.05,
+      "width": 0.9,
+      "height": 2.1,
+      "rotation": 90,
+      "color": "#8B7355"
+    },
+    {
+      "x": 7.5,
+      "z": 3,
+      "y": 1.05,
+      "width": 0.9,
+      "height": 2.1,
+      "rotation": 90,
+      "color": "#8B7355"
+    },
+    {
+      "x": 7.5,
+      "z": 9,
+      "y": 1.05,
+      "width": 0.9,
+      "height": 2.1,
+      "rotation": 90,
+      "color": "#8B7355"
+    },
+    {
+      "x": 7.5,
+      "z": 6,
+      "y": 1.05,
+      "width": 0.9,
+      "height": 2.1,
+      "rotation": 90,
+      "color": "#8B7355"
+    },
+    {
+      "x": 4,
+      "z": 2.5,
+      "y": 1.05,
+      "width": 0.9,
+      "height": 2.1,
+      "rotation": 0,
+      "color": "#8B7355"
+    },
+    {
+      "x": 8,
+      "z": 2.5,
+      "y": 1.05,
+      "width": 0.9,
+      "height": 2.1,
+      "rotation": 0,
+      "color": "#8B7355"
+    }
+  ],
+  "windows": [],
+  "floor": {
+    "width": 12,
+    "depth": 12,
+    "y": 0,
+    "color": "#d4c5b2"
+  },
+  "camera": {
+    "position": {
+      "x": 6.0,
+      "y": 8,
+      "z": 6.0
+    },
+    "lookAt": {
+      "x": 6.0,
+      "y": 0,
+      "z": 6.0
+    }
+  }
+}
