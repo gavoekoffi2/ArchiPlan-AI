@@ -824,6 +824,65 @@ def model_to_obj(model: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
+# ─── WEBHOOK DEPLOIEMENT AUTO ───────────────────────────────────────
+import subprocess, threading
+
+WEBHOOK_SECRET = os.environ.get("ARCHIPLAN_WEBHOOK_SECRET", "archiplan-deploy-2026")
+DEPLOY_SCRIPT = BASE_DIR.parent / "deploy.sh"
+
+
+def _run_deploy_async() -> None:
+    """Lance le déploiement en arrière-plan (processus séparé)."""
+    logger.info("🚀 Déploiement automatique déclenché via webhook")
+    try:
+        subprocess.Popen(
+            ["/bin/bash", str(DEPLOY_SCRIPT)],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,  # détaché du processus serveur
+        )
+    except Exception as exc:
+        logger.error("Échec lancement déploiement: %s", exc)
+
+
+@app.post("/api/deploy")
+async def github_webhook(request: Request):
+    """
+    Webhook GitHub → déploiement automatique.
+    Quand Claude Code push, GitHub appelle cette URL → le serveur se met à jour tout seul.
+    """
+    raw_body = await request.body()
+    try:
+        body = json.loads(raw_body)
+    except Exception:
+        raise HTTPException(400, "JSON attendu")
+
+    # Vérification du secret (header X-Hub-Signature-256)
+    signature = request.headers.get("X-Hub-Signature-256", "")
+    if WEBHOOK_SECRET:
+        import hmac, hashlib
+        expected = "sha256=" + hmac.new(
+            WEBHOOK_SECRET.encode(), raw_body, hashlib.sha256
+        ).hexdigest()
+        logger.debug("Webhook: sig_recue=%s sig_attendue=%s body_len=%d",
+                     signature[:30] if signature else "ABSENT",
+                     expected[:30], len(raw_body))
+        if not hmac.compare_digest(signature, expected):
+            logger.warning("Webhook: signature invalide — recue=%s... attendue=%s... body_preview=%s",
+                          signature[:50], expected[:50], raw_body[:80])
+            raise HTTPException(403, "Signature invalide")
+
+    # On ne déploie que pour les pushs sur master
+    ref = body.get("ref", "")
+    if ref != "refs/heads/master":
+        return {"status": "ignored", "ref": ref, "reason": "pas master"}
+
+    # Lancement asynchrone (ne bloque pas la réponse HTTP)
+    threading.Thread(target=_run_deploy_async, daemon=True).start()
+
+    return {"status": "deploying", "message": "Déploiement lancé — le serveur redémarre"}
+
+
 # ─── STATIC FILES ───────────────────────────────────────────────────
 # Middleware anti-cache pour éviter que le navigateur garde l'ancienne version
 @app.middleware("http")
