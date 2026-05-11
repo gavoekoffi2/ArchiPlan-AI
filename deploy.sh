@@ -4,7 +4,7 @@
 set -e
 
 REPO_DIR="/root/archiplan3d"
-LOG_FILE="/root/archiplan3d/logs/deploy.log"
+LOG_FILE="/root/archiplan3d/app/logs/deploy.log"
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
