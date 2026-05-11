@@ -57,8 +57,16 @@ body{font-family:Inter,Segoe UI,system-ui,sans-serif;background:var(--bg);color:
 .tool[data-tooltip]:hover::after{content:attr(data-tooltip);position:absolute;left:46px;top:50%;transform:translateY(-50%);background:var(--s2);padding:4px 8px;border-radius:6px;font-size:11px;white-space:nowrap;color:var(--t);border:1px solid var(--b);box-shadow:var(--shadow);z-index:100}
 
 /* Right sidebar */
-#sidebar{position:absolute;right:12px;top:60px;width:280px;max-height:calc(100vh - 140px);overflow-y:auto;transition:all .3s;z-index:15}
+#sidebar{position:absolute;right:12px;top:60px;width:280px;max-height:calc(100vh - 140px);overflow-y:auto;z-index:15}
 #sidebar.hidden{display:none}
+#sidebar.dragging,#furniture-panel.dragging,#toolbar.dragging{opacity:.7;cursor:grabbing!important}
+
+/* Drag handle (poignée glissable en haut de chaque panneau déplaçable) */
+.drag-handle{cursor:grab;user-select:none;display:flex;align-items:center;justify-content:space-between;margin:-14px -14px 10px -14px;padding:8px 14px;border-bottom:1px solid var(--b);border-radius:var(--r) var(--r) 0 0;background:rgba(108,92,231,.08);font-size:10px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:1px}
+.drag-handle:active{cursor:grabbing}
+.drag-handle::before{content:"⋮⋮";font-size:14px;letter-spacing:-2px;color:var(--a)}
+.drag-close{background:none;border:none;color:var(--t2);font-size:16px;cursor:pointer;padding:0;width:18px;height:18px;line-height:1}
+.drag-close:hover{color:var(--t)}
 .sidebar-section{padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid var(--b)}
 .sidebar-section:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0}
 .sidebar-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--t2);margin-bottom:8px}
@@ -111,7 +119,14 @@ body{font-family:Inter,Segoe UI,system-ui,sans-serif;background:var(--bg);color:
 @keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(-8px)}}
 
 /* Walk mode */
-#walk-hint{position:absolute;bottom:60px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--t2);background:var(--panel);padding:5px 12px;border-radius:8px;display:none;z-index:20;border:1px solid var(--b)}
+#walk-hint{position:absolute;bottom:60px;left:50%;transform:translateX(-50%);font-size:11px;color:var(--t);background:var(--panel);padding:8px 16px;border-radius:8px;display:none;z-index:20;border:1px solid var(--a);box-shadow:var(--shadow)}
+#walk-overlay{position:fixed;inset:0;z-index:22;display:none;align-items:center;justify-content:center;background:rgba(10,10,15,.55);backdrop-filter:blur(6px);cursor:pointer}
+#walk-overlay.show{display:flex}
+.walk-card{background:var(--panel);border:1px solid var(--a);border-radius:var(--r);padding:30px 40px;text-align:center;box-shadow:var(--shadow);max-width:420px}
+.walk-card h2{font-size:18px;margin-bottom:8px;color:var(--t)}
+.walk-card p{font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px}
+.walk-card .key{display:inline-block;background:rgba(108,92,231,.2);border:1px solid var(--a);border-radius:6px;padding:2px 8px;margin:0 2px;font-family:monospace;font-size:11px;color:var(--t)}
+.walk-card .start-btn{padding:10px 24px;font-size:13px;font-weight:600;background:linear-gradient(135deg,var(--a),#4834d4);color:#fff;border:none;border-radius:8px;cursor:pointer;margin-top:8px}
 #minimap{position:absolute;left:12px;bottom:12px;width:200px;height:160px;background:var(--panel);border:1px solid var(--b);border-radius:var(--rs);z-index:18;display:none;box-shadow:var(--shadow);overflow:hidden}
 #minimap canvas{width:100%;height:100%;display:block}
 
@@ -187,6 +202,7 @@ canvas{display:block}
 
   <!-- Right sidebar with rooms + metrics -->
   <div id="sidebar" class="panel hidden">
+    <div class="drag-handle" data-drag="sidebar">Infos<button class="drag-close" onclick="toggleSidebar()" title="Fermer">×</button></div>
     <div class="sidebar-section">
       <div class="sidebar-title">Pièces</div>
       <div id="room-list"></div>
@@ -207,7 +223,7 @@ canvas{display:block}
 
   <!-- Furniture panel -->
   <div id="furniture-panel" class="panel hidden">
-    <div class="sidebar-title">🪑 Ajouter un meuble</div>
+    <div class="drag-handle" data-drag="furniture-panel">🪑 Meubles<button class="drag-close" onclick="toggleFurniturePanel()" title="Fermer">×</button></div>
     <div class="furniture-grid">
       <button class="furniture-btn" onclick="addFurniture('bed')">🛏️ Lit</button>
       <button class="furniture-btn" onclick="addFurniture('nightstand')">🗃️ Chevet</button>
@@ -227,6 +243,9 @@ canvas{display:block}
       <button class="furniture-btn" onclick="addFurniture('toilet')">🚽 WC</button>
       <button class="furniture-btn" onclick="addFurniture('plant')">🌿 Plante</button>
       <button class="furniture-btn" onclick="addFurniture('rug')">🟫 Tapis</button>
+      <button class="furniture-btn" onclick="addFurniture('dresser')">🗄️ Commode</button>
+      <button class="furniture-btn" onclick="addFurniture('mirror')">🪞 Miroir</button>
+      <button class="furniture-btn" onclick="addFurniture('painting')">🖼️ Tableau</button>
     </div>
     <div style="font-size:10px;color:var(--t2);margin-top:6px;line-height:1.4">💡 Cliquez-glissez un meuble en mode Orbite pour le déplacer.</div>
     <button class="btn btn-danger btn-xs" onclick="clearFurniture()" style="margin-top:6px;width:100%">🗑️ Tout supprimer</button>
@@ -249,7 +268,24 @@ canvas{display:block}
     Surface<span class="stat-val" id="stat-area">—</span>m²
   </div>
 
-  <div id="walk-hint">WASD = Déplacement · Souris = Regarder · Shift = Courir · Esc = Quitter</div>
+  <div id="walk-hint">
+    <span class="key">WASD</span> ou flèches ·
+    <span class="key">Souris</span> regarder ·
+    <span class="key">Shift</span> courir ·
+    <span class="key">Esc</span> sortir
+  </div>
+  <div id="walk-overlay">
+    <div class="walk-card">
+      <h2>🚶 Visite virtuelle</h2>
+      <p>Vous êtes sur le point d'entrer dans la maison.</p>
+      <p>
+        Déplacez-vous : <span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span><br>
+        Regardez : déplacez la <span class="key">souris</span> · sortir : <span class="key">Esc</span>
+      </p>
+      <button class="start-btn" id="walk-start">▶ Commencer la visite</button>
+      <p style="margin-top:10px;font-size:10px">Astuce : si la souris ne tourne pas la vue, cliquez-glissez dans le viewer.</p>
+    </div>
+  </div>
   <div id="minimap"><canvas id="minimap-canvas" width="400" height="320"></canvas></div>
 </div>
 
@@ -483,10 +519,133 @@ function initScene() {
     const f = e.dataTransfer.files[0]; if (f) uploadFile(f);
   });
 
+  // Panneaux déplaçables : sidebar, furniture-panel, toolbar
+  initDraggablePanels();
+
+  // Bouton de démarrage de la visite (geste utilisateur requis pour pointer lock)
+  document.getElementById('walk-start').addEventListener('click', startWalkMode);
+  // Cliquer hors de la carte annule
+  document.getElementById('walk-overlay').addEventListener('click', e => {
+    if (e.target.id === 'walk-overlay') {
+      document.getElementById('walk-overlay').classList.remove('show');
+      document.getElementById('btn-orbit').classList.add('active');
+      document.getElementById('btn-walk').classList.remove('active');
+    }
+  });
+
   hideLoading();
   animate();
   console.log('ArchiPlan AI v2 prêt ✓');
 }
+
+// ─── WALK START : geste utilisateur explicite ───
+function startWalkMode() {
+  if (!state.modelData?.rooms?.length) return;
+  state.isWalkMode = true;
+  state.controls.enabled = false;
+  document.getElementById('walk-hint').style.display = 'block';
+  document.getElementById('minimap').style.display = 'block';
+  document.getElementById('walk-overlay').classList.remove('show');
+
+  const meta = state.modelData.metadata || {};
+  const tw = meta.total_width || 10, td = meta.total_depth || 8;
+  const r = state.modelData.rooms[0];
+  const px = r.x + r.width/2, pz = r.z + r.depth/2;
+  state.camera.position.set(px, 1.65, pz);
+  const angle = Math.atan2(px - tw/2, pz - td/2);
+  state.euler.set(0, angle + Math.PI, 0);
+  state.camera.quaternion.setFromEuler(state.euler);
+
+  // Pointer lock — déclenché par le clic utilisateur sur le bouton (geste valide)
+  try {
+    const p = state.renderer.domElement.requestPointerLock();
+    if (p && p.catch) p.catch(err => { console.warn('Pointer lock:', err); });
+  } catch (e) { console.warn(e); }
+  toast('🚶 Visite : WASD pour bouger · Esc pour sortir', 'success');
+}
+
+// ─── DRAG DES PANNEAUX ───
+function initDraggablePanels() {
+  // sidebar et furniture-panel : drag par leur poignée .drag-handle
+  document.querySelectorAll('.drag-handle').forEach(handle => {
+    const panelId = handle.dataset.drag;
+    const panel = document.getElementById(panelId);
+    if (!panel) return;
+    restorePanelPos(panel, panelId);
+    handle.addEventListener('mousedown', e => startDrag(e, panel, panelId, handle));
+    handle.addEventListener('touchstart', e => startDrag(e.touches[0], panel, panelId, handle), { passive: true });
+  });
+  // toolbar : drag direct par son fond (mais pas les boutons)
+  const toolbar = document.getElementById('toolbar');
+  if (toolbar) {
+    toolbar.style.cursor = 'grab';
+    restorePanelPos(toolbar, 'toolbar');
+    toolbar.addEventListener('mousedown', e => {
+      // Ne pas démarrer le drag si on a cliqué sur un bouton outil
+      if (e.target.classList.contains('tool')) return;
+      startDrag(e, toolbar, 'toolbar', toolbar);
+    });
+  }
+}
+
+function startDrag(ev, panel, panelId, handle) {
+  ev.preventDefault?.();
+  const rect = panel.getBoundingClientRect();
+  const offX = ev.clientX - rect.left;
+  const offY = ev.clientY - rect.top;
+  panel.classList.add('dragging');
+  // Forcer position absolue par top/left (efface right/bottom)
+  panel.style.left = rect.left + 'px';
+  panel.style.top = rect.top + 'px';
+  panel.style.right = 'auto';
+  panel.style.bottom = 'auto';
+  const move = (e) => {
+    const p = e.touches ? e.touches[0] : e;
+    let nx = p.clientX - offX;
+    let ny = p.clientY - offY;
+    nx = Math.max(0, Math.min(window.innerWidth - rect.width, nx));
+    ny = Math.max(0, Math.min(window.innerHeight - rect.height, ny));
+    panel.style.left = nx + 'px';
+    panel.style.top = ny + 'px';
+  };
+  const up = () => {
+    panel.classList.remove('dragging');
+    document.removeEventListener('mousemove', move);
+    document.removeEventListener('mouseup', up);
+    document.removeEventListener('touchmove', move);
+    document.removeEventListener('touchend', up);
+    try {
+      localStorage.setItem('archiplan-pos-' + panelId, JSON.stringify({
+        left: panel.style.left, top: panel.style.top,
+      }));
+    } catch (e) {}
+  };
+  document.addEventListener('mousemove', move);
+  document.addEventListener('mouseup', up);
+  document.addEventListener('touchmove', move, { passive: false });
+  document.addEventListener('touchend', up);
+}
+
+function restorePanelPos(panel, panelId) {
+  try {
+    const saved = JSON.parse(localStorage.getItem('archiplan-pos-' + panelId) || 'null');
+    if (saved && saved.left && saved.top) {
+      panel.style.left = saved.left;
+      panel.style.top = saved.top;
+      panel.style.right = 'auto';
+      panel.style.bottom = 'auto';
+    }
+  } catch (e) {}
+}
+
+window.resetPanelPositions = function() {
+  ['sidebar','furniture-panel','toolbar'].forEach(id => {
+    localStorage.removeItem('archiplan-pos-' + id);
+    const p = document.getElementById(id);
+    if (p) { p.style.left = p.style.top = p.style.right = p.style.bottom = ''; }
+  });
+  toast('🔄 Position des panneaux réinitialisée');
+};
 
 // ─── RENDER LOOP ───
 function animate() {
@@ -581,31 +740,17 @@ function setMode(m) {
   if (m === 'walk') {
     if (!state.modelData?.rooms?.length) {
       toast('Chargez un plan d\'abord', 'error');
+      document.getElementById('btn-orbit').classList.add('active');
+      document.getElementById('btn-walk').classList.remove('active');
       return;
     }
     // Sauvegarde l'état Orbite AVANT d'entrer en Visite
     state._savedOrbitTarget = state.controls.target.clone();
     state._savedCameraPos = state.camera.position.clone();
     state._savedCameraQuat = state.camera.quaternion.clone();
-    state.isWalkMode = true;
-    state.controls.enabled = false;
-    document.getElementById('walk-hint').style.display = 'block';
-    document.getElementById('minimap').style.display = 'block';
 
-    // Position : centre de la 1re pièce, orientée vers le centre de la maison
-    const meta = state.modelData.metadata || {};
-    const tw = meta.total_width || 10, td = meta.total_depth || 8;
-    const r = state.modelData.rooms[0];
-    const px = r.x + r.width/2, pz = r.z + r.depth/2;
-    state.camera.position.set(px, 1.65, pz);
-    // Regarder vers le centre de la maison
-    const angle = Math.atan2(px - tw/2, pz - td/2);
-    state.euler.set(0, angle + Math.PI, 0);
-    state.camera.quaternion.setFromEuler(state.euler);
-
-    // Demander pointer lock — peut échouer dans certains contextes (iframe…), on tolère
-    try { state.renderer.domElement.requestPointerLock(); } catch (e) { console.warn(e); }
-    toast('🚶 Visite : WASD pour bouger · souris pour regarder · Esc pour sortir', 'success');
+    // Affiche l'overlay — l'utilisateur doit cliquer pour démarrer (geste utilisateur requis pour pointer lock)
+    document.getElementById('walk-overlay').classList.add('show');
   } else {
     state.isWalkMode = false;
     if (document.pointerLockElement) document.exitPointerLock();
@@ -940,46 +1085,60 @@ function generateWallsFromRooms(rooms, tw, td, h, thick) {
 const FURN_DIM = {
   bed:{w:1.65,d:2.1}, wardrobe:{w:1.5,d:0.6}, desk:{w:1.4,d:0.7},
   chair:{w:0.5,d:0.5}, nightstand:{w:0.5,d:0.45}, lamp:{w:0.3,d:0.3},
-  sofa:{w:2.3,d:0.95}, table:{w:1.5,d:1.0}, dining_table:{w:1.8,d:1.0},
-  tv:{w:1.3,d:0.2}, plant:{w:0.5,d:0.5},
+  sofa:{w:2.3,d:0.95}, table:{w:1.0,d:0.6}, dining_table:{w:1.6,d:0.9},
+  tv:{w:1.3,d:0.45}, plant:{w:0.5,d:0.5},
   kitchen:{w:2.1,d:0.65}, fridge:{w:0.7,d:0.7}, sink:{w:0.65,d:0.5},
   bathtub:{w:1.7,d:0.8}, toilet:{w:0.42,d:0.7}, bookshelf:{w:1.0,d:0.35},
-  rug:{w:1.8,d:1.2},
+  rug:{w:1.8,d:1.2}, dresser:{w:1.0,d:0.5}, mirror:{w:0.7,d:0.05},
+  painting:{w:0.8,d:0.06},
 };
 
-// Placer un meuble contre un mur ('N'/'S'/'E'/'W') à une fraction t le long du mur (0..1)
-// Retourne l'objet placé ou null si trop petit.
+// Placer un meuble contre un mur ('N'/'S'/'E'/'W') à une fraction t le long du mur (0..1).
+// Convention des meubles : le DOS du meuble est en -z (le dossier/tête de lit est à z<0).
+// Donc à rot=0, le meuble fait face à +z et a son dos en -z.
+// Pour avoir le dos contre le mur N (z faible), il faut rot=0.
+// Pour avoir le dos contre le mur S (z fort), il faut rot=π.
+// Pour avoir le dos contre le mur W (x faible), il faut rot=+π/2.
+// Pour avoir le dos contre le mur E (x fort), il faut rot=-π/2.
 function placeAgainstWall(room, wall, type, t = 0.5, clearance = 0.05) {
   const dim = FURN_DIM[type] || { w: 0.5, d: 0.5 };
   const margin = 0.1 + clearance;
   const rw = room.width, rd = room.depth;
-  if (rw < dim.w + 0.2 || rd < dim.d + 0.2) return null;
-  let x, z, rot;
+  let x, z, rot, needX, needZ;
   switch (wall) {
-    case 'N': // mur du haut (petit z) — meuble face vers +z, dos contre le mur
-      x = room.x + Math.max(dim.w/2 + margin, Math.min(rw - dim.w/2 - margin, t * rw));
+    case 'N': // mur du haut (z faible), dos contre le mur
+      needX = dim.w; needZ = dim.d;
+      if (rw < needX + 0.2 || rd < needZ + 0.2) return null;
+      x = room.x + clamp(t * rw, dim.w/2 + margin, rw - dim.w/2 - margin);
       z = room.z + dim.d / 2 + margin;
-      rot = Math.PI;
-      break;
-    case 'S':
-      x = room.x + Math.max(dim.w/2 + margin, Math.min(rw - dim.w/2 - margin, t * rw));
-      z = room.z + rd - dim.d / 2 - margin;
       rot = 0;
       break;
-    case 'W':
-      x = room.x + dim.d / 2 + margin;
-      z = room.z + Math.max(dim.w/2 + margin, Math.min(rd - dim.w/2 - margin, t * rd));
-      rot = -Math.PI / 2;
+    case 'S': // mur du bas (z fort)
+      needX = dim.w; needZ = dim.d;
+      if (rw < needX + 0.2 || rd < needZ + 0.2) return null;
+      x = room.x + clamp(t * rw, dim.w/2 + margin, rw - dim.w/2 - margin);
+      z = room.z + rd - dim.d / 2 - margin;
+      rot = Math.PI;
       break;
-    case 'E':
-      x = room.x + rw - dim.d / 2 - margin;
-      z = room.z + Math.max(dim.w/2 + margin, Math.min(rd - dim.w/2 - margin, t * rd));
+    case 'W': // mur de gauche (x faible)
+      needX = dim.d; needZ = dim.w;
+      if (rw < needX + 0.2 || rd < needZ + 0.2) return null;
+      x = room.x + dim.d / 2 + margin;
+      z = room.z + clamp(t * rd, dim.w/2 + margin, rd - dim.w/2 - margin);
       rot = Math.PI / 2;
+      break;
+    case 'E': // mur de droite (x fort)
+      needX = dim.d; needZ = dim.w;
+      if (rw < needX + 0.2 || rd < needZ + 0.2) return null;
+      x = room.x + rw - dim.d / 2 - margin;
+      z = room.z + clamp(t * rd, dim.w/2 + margin, rd - dim.w/2 - margin);
+      rot = -Math.PI / 2;
       break;
     default: return null;
   }
   return placeFurniture(type, x, 0, z, rot);
 }
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
 function placeAtCenter(room, type, offsetX = 0, offsetZ = 0, rot = 0) {
   return placeFurniture(type, room.x + room.width/2 + offsetX, 0, room.z + room.depth/2 + offsetZ, rot);
@@ -990,79 +1149,118 @@ function autoPlaceFurniture(rooms) {
     const area = room.width * room.depth;
     const type = (room.type || '').toLowerCase();
     const name = (room.name || '').toLowerCase();
-    const isLiving = type === 'living' || /salon|living/.test(name);
-    const isKitchen = type === 'kitchen' || /cuisin/.test(name);
-    const isBedroom = type === 'bedroom' || /chambre|bedroom/.test(name);
+    const isLiving = type === 'living' || /salon|living|sejour|séjour/.test(name);
+    const isKitchen = type === 'kitchen' || /cuisin|kitchen/.test(name);
+    const isBedroom = type === 'bedroom' || /chambre|bedroom|chamb/.test(name);
     const isBathroom = type === 'bathroom' || /sdb|bain|salle.*eau|bath/.test(name);
-    const isWC = type === 'wc' || /wc|toilet/.test(name);
+    const isWC = type === 'wc' || /^wc$|toilett|^toilet$/.test(name);
     const isOffice = type === 'office' || /bureau|office/.test(name);
     const isDining = type === 'dining' || /repas|dining|salle.*manger/.test(name);
     const isHall = type === 'hallway' || type === 'entrance' || /entr.e|couloir|hall/.test(name);
+    const isStorage = type === 'storage' || /placard|rangement|debarras/.test(name);
+    const isGarage = type === 'garage' || /garage/.test(name);
 
-    // Choisir le mur "principal" : celui qui longe le plus grand côté
-    const longSideWall = room.width >= room.depth ? 'S' : 'E'; // mur le plus long
+    // Le mur LONG (plus long côté) et son mur opposé
+    const longSideWall = room.width >= room.depth ? 'S' : 'E';
     const oppWall = room.width >= room.depth ? 'N' : 'W';
+    const perpWall = room.width >= room.depth ? 'W' : 'N';
+    const perpWall2 = room.width >= room.depth ? 'E' : 'S';
+
+    let placed = 0;
+    const tryPlace = (...args) => { if (placeAgainstWall(...args)) placed++; };
+    const tryCenter = (...args) => { if (placeAtCenter(...args)) placed++; };
 
     try {
       if (isBedroom) {
-        // Lit contre un mur long, tête au mur, centré
-        placeAgainstWall(room, oppWall, 'bed', 0.5);
-        // Chevets de part et d'autre du lit
-        if (room.width > 2.2 && room.depth > 2.5) {
-          // approximer position des chevets : sur le même mur, décalés
-          placeAgainstWall(room, oppWall, 'nightstand', 0.18);
-          placeAgainstWall(room, oppWall, 'nightstand', 0.82);
+        // Lit dos au mur opposé (court côté), tête au mur
+        tryPlace(room, oppWall, 'bed', 0.5);
+        // 2 chevets aux côtés du lit (même mur que le lit)
+        if (Math.min(room.width, room.depth) > 2.2) {
+          tryPlace(room, oppWall, 'nightstand', 0.15);
+          tryPlace(room, oppWall, 'nightstand', 0.85);
         }
-        // Armoire sur le mur opposé
-        placeAgainstWall(room, longSideWall, 'wardrobe', 0.5);
-        // Bureau sur un mur perpendiculaire si grande chambre
-        if (area > 12) {
-          const perpWall = oppWall === 'N' || oppWall === 'S' ? 'W' : 'N';
-          placeAgainstWall(room, perpWall, 'desk', 0.3);
-          placeAgainstWall(room, perpWall, 'chair', 0.3, 0.6);
+        // Armoire sur mur opposé au lit (mur long)
+        tryPlace(room, longSideWall, 'wardrobe', 0.25);
+        // Commode (dresser) sur mur long
+        if (area > 8) tryPlace(room, longSideWall, 'dresser', 0.75);
+        // Bureau + chaise sur mur perp si chambre moyenne+
+        if (area > 10) {
+          tryPlace(room, perpWall, 'desk', 0.5);
+          // chaise au-dessus du bureau (vers l'intérieur)
+          const dim = FURN_DIM.desk;
+          const chairOff = 0.6;
+          if (perpWall === 'W') placeFurniture('chair', room.x + dim.d + 0.15 + chairOff, 0, room.z + clamp(0.5*room.depth, 0.5, room.depth-0.5), -Math.PI/2);
+          else placeFurniture('chair', room.x + clamp(0.5*room.width, 0.5, room.width-0.5), 0, room.z + dim.d + 0.15 + chairOff, 0);
         }
+        // Miroir sur le mur perpendiculaire opposé
+        tryPlace(room, perpWall2, 'mirror', 0.5);
+        // Tapis devant le lit
+        if (area > 8) placeAtCenter(room, 'rug', 0, 0.4, 0);
+        // Tableau au-dessus du lit
+        tryPlace(room, oppWall, 'painting', 0.5);
+        // Plante dans un coin
+        if (area > 7) tryPlace(room, perpWall, 'plant', 0.95);
       } else if (isLiving) {
-        placeAgainstWall(room, oppWall, 'sofa', 0.5);
-        // TV sur mur opposé
-        placeAgainstWall(room, longSideWall, 'tv', 0.5);
-        // Table basse au centre, plus proche du canapé
-        placeAtCenter(room, 'table');
-        placeAgainstWall(room, 'N', 'plant', 0.05);
-        if (area > 18) placeAgainstWall(room, 'S', 'plant', 0.95);
+        tryPlace(room, oppWall, 'sofa', 0.5);
+        tryPlace(room, longSideWall, 'tv', 0.5);
+        tryCenter(room, 'table');
+        tryPlace(room, perpWall, 'bookshelf', 0.3);
+        tryPlace(room, oppWall, 'plant', 0.05);
+        if (area > 18) tryPlace(room, oppWall, 'plant', 0.95);
+        if (area > 14) placeAtCenter(room, 'rug', 0, 0, 0);
+        tryPlace(room, oppWall, 'painting', 0.5);
       } else if (isKitchen) {
-        // Cuisinière le long du mur le plus long
-        placeAgainstWall(room, longSideWall, 'kitchen', 0.5);
-        // Frigo dans un coin
-        placeAgainstWall(room, longSideWall, 'fridge', 0.92);
-        // Évier sur un mur perpendiculaire
-        const perp = longSideWall === 'S' ? 'W' : 'N';
-        placeAgainstWall(room, perp, 'sink', 0.5);
-        if (area > 12) placeAtCenter(room, 'dining_table');
+        tryPlace(room, longSideWall, 'kitchen', 0.5);
+        tryPlace(room, longSideWall, 'fridge', 0.95);
+        tryPlace(room, perpWall, 'sink', 0.5);
+        if (area > 12) {
+          placeAtCenter(room, 'dining_table');
+          placeAtCenter(room, 'chair', -0.9, 0, Math.PI/2);
+          placeAtCenter(room, 'chair', 0.9, 0, -Math.PI/2);
+        }
       } else if (isBathroom) {
-        placeAgainstWall(room, longSideWall, 'bathtub', 0.5);
-        const perp = longSideWall === 'S' ? 'W' : 'N';
-        placeAgainstWall(room, perp, 'sink', 0.5);
-        const perp2 = longSideWall === 'S' ? 'E' : 'S';
-        placeAgainstWall(room, perp2, 'toilet', 0.5);
+        tryPlace(room, longSideWall, 'bathtub', 0.5);
+        tryPlace(room, perpWall, 'sink', 0.5);
+        tryPlace(room, perpWall2, 'toilet', 0.5);
+        tryPlace(room, perpWall, 'mirror', 0.5);
       } else if (isWC) {
-        placeAgainstWall(room, oppWall, 'toilet', 0.5);
-        if (area > 2) placeAgainstWall(room, longSideWall, 'sink', 0.5);
+        tryPlace(room, oppWall, 'toilet', 0.5);
+        if (area > 2) tryPlace(room, longSideWall, 'sink', 0.5);
       } else if (isOffice) {
-        placeAgainstWall(room, oppWall, 'desk', 0.5);
-        placeAgainstWall(room, oppWall, 'chair', 0.5, 0.6);
-        placeAgainstWall(room, longSideWall, 'bookshelf', 0.3);
+        tryPlace(room, oppWall, 'desk', 0.5);
+        if (perpWall === 'W') placeFurniture('chair', room.x + 0.7 + 0.6, 0, room.z + room.depth/2, -Math.PI/2);
+        else placeFurniture('chair', room.x + room.width/2, 0, room.z + 0.7 + 0.6, 0);
+        tryPlace(room, longSideWall, 'bookshelf', 0.3);
+        if (area > 8) tryPlace(room, longSideWall, 'plant', 0.9);
+        tryPlace(room, perpWall2, 'painting', 0.5);
       } else if (isDining) {
         placeAtCenter(room, 'dining_table');
-        // 4 chaises autour
         const cx = room.x + room.width/2, cz = room.z + room.depth/2;
-        placeFurniture('chair', cx - 0.9, 0, cz, Math.PI/2);
-        placeFurniture('chair', cx + 0.9, 0, cz, -Math.PI/2);
-        placeFurniture('chair', cx, 0, cz - 0.7, Math.PI);
-        placeFurniture('chair', cx, 0, cz + 0.7, 0);
+        placeFurniture('chair', cx - 0.9, 0, cz, -Math.PI/2);
+        placeFurniture('chair', cx + 0.9, 0, cz, Math.PI/2);
+        placeFurniture('chair', cx, 0, cz - 0.7, 0);
+        placeFurniture('chair', cx, 0, cz + 0.7, Math.PI);
+        if (area > 12) tryPlace(room, oppWall, 'plant', 0.05);
       } else if (isHall) {
-        // Couloir / entrée — léger
-        if (area > 4) placeAgainstWall(room, 'N', 'plant', 0.95);
-      } else if (area > 6) {
+        if (area > 3) tryPlace(room, oppWall, 'plant', 0.95);
+        if (area > 6) tryPlace(room, longSideWall, 'painting', 0.5);
+      } else if (isStorage || isGarage) {
+        tryPlace(room, oppWall, 'bookshelf', 0.5);
+      } else {
+        // Inconnu — heuristique sur la surface
+        if (area < 4) tryPlace(room, oppWall, 'toilet', 0.5);
+        else if (area < 8) {
+          tryPlace(room, oppWall, 'desk', 0.5);
+          tryPlace(room, longSideWall, 'bookshelf', 0.5);
+        }
+        else {
+          tryPlace(room, oppWall, 'bed', 0.5);
+          tryPlace(room, longSideWall, 'wardrobe', 0.5);
+        }
+      }
+
+      // FILET DE SÉCURITÉ : toujours placer un meuble visible
+      if (placed === 0) {
         placeAtCenter(room, 'plant');
       }
     } catch (e) { console.warn('Placement furniture room', idx, e); }
@@ -1328,7 +1526,40 @@ function createFurnitureMesh(type) {
       break;
 
     case 'rug':
-      group.add(mk(1.8, 0.02, 1.2, fabricLight, 0, 0.015, 0));
+      group.add(mk(1.8, 0.015, 1.2, fabricLight, 0, 0.012, 0));
+      // motif central
+      group.add(mk(1.2, 0.005, 0.8, fabric, 0, 0.022, 0));
+      group.add(mk(0.4, 0.003, 0.4, white, 0, 0.026, 0));
+      break;
+
+    case 'dresser':
+      // Commode 1m × 0.5m × 0.85m haut, 3 tiroirs
+      group.add(mk(1.0, 0.85, 0.5, wood, 0, 0.425, 0));
+      // tiroirs visibles (séparations)
+      for (let i = 0; i < 3; i++) {
+        const y = 0.15 + i * 0.25;
+        group.add(mk(0.94, 0.22, 0.02, woodDark, 0, y, 0.26));
+        // poignées
+        group.add(mk(0.2, 0.03, 0.02, metal, 0, y, 0.27));
+      }
+      // dessus de commode : photo + petit objet
+      group.add(mk(0.18, 0.22, 0.02, dark, -0.3, 0.96, 0));
+      group.add(mkCyl(0.06, 0.08, 0.12, cream, 0.25, 0.91, 0));
+      break;
+
+    case 'mirror':
+      // Miroir au mur, 0.7×1.2m, posé à 1m du sol
+      group.add(mk(0.7, 1.2, 0.04, woodDark, 0, 1.4, 0));
+      group.add(mk(0.62, 1.12, 0.02, new THREE.MeshStandardMaterial({color:'#c8d8e8',roughness:.05,metalness:.4,emissive:'#101820',emissiveIntensity:.1}), 0, 1.4, 0.025));
+      break;
+
+    case 'painting':
+      // Tableau au mur, 0.8×0.6m, posé à 1.5m
+      group.add(mk(0.85, 0.65, 0.04, woodDark, 0, 1.55, 0));
+      // toile (couleur aléatoire pour variation)
+      const paintColors = ['#3a5da0','#8a4a3a','#4a8a3a','#a08030','#6a4090'];
+      const pc = new THREE.MeshStandardMaterial({color: paintColors[Math.floor(Math.random()*5)], roughness:.7});
+      group.add(mk(0.75, 0.55, 0.02, pc, 0, 1.55, 0.025));
       break;
 
     default:
