@@ -1,0 +1,21 @@
+services:
+  archiplan:
+    build: .
+    image: archiplan-ai:latest
+    container_name: archiplan
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    environment:
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:?La variable OPENROUTER_API_KEY est requise}
+      ARCHIPLAN_RATE_LIMIT: ${ARCHIPLAN_RATE_LIMIT:-60}
+      ARCHIPLAN_PRICE_M2: ${ARCHIPLAN_PRICE_M2:-1800}
+    volumes:
+      - ./app/uploads:/srv/app/uploads
+      - ./app/output:/srv/app/output
+      - ./app/logs:/srv/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:9090/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

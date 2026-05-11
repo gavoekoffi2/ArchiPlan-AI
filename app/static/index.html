@@ -5,16 +5,28 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ArchiPlan AI — Architecture 3D Intelligente</title>
 <style>
-:root{--bg:#0a0a0f;--s1:#14141f;--s2:#1a1a2e;--b:#2a2a3e;--t:#e8e8f0;--t2:#9898b0;--a:#6c5ce7;--a2:#a29bfe;--r:14px;--rs:10px}
+:root[data-theme="dark"]{
+  --bg:#0a0a0f; --s1:#14141f; --s2:#1a1a2e; --b:#2a2a3e;
+  --t:#e8e8f0; --t2:#9898b0; --a:#6c5ce7; --a2:#a29bfe;
+  --panel:rgba(20,20,31,.88); --grid:#1a1a3a; --canvas-bg:#0a0a14;
+  --floor-day:#c8b898; --shadow:0 4px 20px rgba(0,0,0,.4);
+}
+:root[data-theme="light"]{
+  --bg:#f4f5f9; --s1:#ffffff; --s2:#eef0f5; --b:#d4d8e0;
+  --t:#1c1d24; --t2:#6a6d78; --a:#5546d6; --a2:#7062e0;
+  --panel:rgba(255,255,255,.92); --grid:#d4d8e0; --canvas-bg:#dde0e6;
+  --floor-day:#d4c5b2; --shadow:0 4px 20px rgba(0,0,0,.08);
+}
+:root{--r:14px;--rs:10px}
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:Inter,Segoe UI,system-ui,sans-serif;background:var(--bg);color:var(--t);overflow:hidden;height:100vh;width:100vw;user-select:none}
+body{font-family:Inter,Segoe UI,system-ui,sans-serif;background:var(--bg);color:var(--t);overflow:hidden;height:100vh;width:100vw;user-select:none;transition:background .3s}
 #viewer{position:fixed;inset:0;z-index:1}
 #ui{position:fixed;inset:0;z-index:10;pointer-events:none}
 #ui>*{pointer-events:auto}
 #header{position:absolute;top:12px;left:12px;right:12px;display:flex;justify-content:space-between;align-items:center;z-index:20}
 .logo{font-size:18px;font-weight:700;background:linear-gradient(135deg,var(--a2),var(--a));-webkit-background-clip:text;-webkit-text-fill-color:transparent;display:flex;align-items:center;gap:8px}
 .logo-icon{width:30px;height:30px;background:linear-gradient(135deg,var(--a),#4834d4);border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:15px;font-weight:800;-webkit-text-fill-color:#fff}
-.panel{background:rgba(20,20,31,.85);border:1px solid var(--b);border-radius:var(--r);backdrop-filter:blur(12px);padding:14px;box-shadow:0 4px 20px rgba(0,0,0,.3)}
+.panel{background:var(--panel);border:1px solid var(--b);border-radius:var(--r);backdrop-filter:blur(12px);padding:14px;box-shadow:var(--shadow)}
 .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:var(--rs);font-size:12px;font-weight:600;border:none;cursor:pointer;transition:all .2s;color:#fff;background:linear-gradient(135deg,var(--a),#4834d4)}
 .btn:hover{transform:translateY(-1px);box-shadow:0 4px 15px rgba(108,92,231,.4)}
 .btn-o{background:transparent;border:1px solid var(--b);color:var(--t)}
@@ -22,62 +34,122 @@ body{font-family:Inter,Segoe UI,system-ui,sans-serif;background:var(--bg);color:
 .btn-xs{padding:5px 10px;font-size:11px}
 .btn-g{padding:9px 16px;font-size:13px}
 .btn-danger{background:linear-gradient(135deg,#e74c3c,#c0392b)}
-.furniture-btn{padding:6px 10px;font-size:11px;background:rgba(108,92,231,.2);border:1px solid rgba(108,92,231,.3);color:var(--t);border-radius:var(--rs);cursor:pointer;transition:all .2s}
-.furniture-btn:hover{background:rgba(108,92,231,.4);border-color:var(--a)}
-.furniture-btn.active{background:rgba(108,92,231,.5);border-color:var(--a2);color:#fff}
-#upload-zone{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:420px;text-align:center;transition:all .5s;z-index:25}
+.furniture-btn{padding:6px 10px;font-size:11px;background:rgba(108,92,231,.18);border:1px solid rgba(108,92,231,.3);color:var(--t);border-radius:var(--rs);cursor:pointer;transition:all .2s}
+.furniture-btn:hover{background:rgba(108,92,231,.35);border-color:var(--a)}
+#upload-zone{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:440px;max-width:92vw;text-align:center;transition:all .5s;z-index:25}
 #upload-zone.hidden{opacity:0;pointer-events:none;transform:translate(-50%,-50%) scale(.95)}
-.drop-area{border:2px dashed var(--b);border-radius:var(--r);padding:40px 20px;cursor:pointer;transition:all .3s;background:rgba(20,20,31,.8)}
+.drop-area{border:2px dashed var(--b);border-radius:var(--r);padding:40px 20px;cursor:pointer;transition:all .3s;background:var(--panel)}
 .drop-area:hover{border-color:var(--a);background:rgba(108,92,231,.08)}
-.drop-icon{font-size:40px;margin-bottom:10px}
+.drop-area.drag{border-color:var(--a);background:rgba(108,92,231,.15)}
+.drop-icon{font-size:42px;margin-bottom:10px}
 .drop-title{font-size:16px;font-weight:600;margin-bottom:4px}
 .drop-sub{font-size:11px;color:var(--t2)}
 .or-divider{display:flex;align-items:center;gap:10px;margin:12px 0;color:var(--t2);font-size:11px}
 .or-divider::before,.or-divider::after{content:'';flex:1;height:1px;background:var(--b)}
-/* Sidebar - now bottom-right compact */
-#sidebar{position:absolute;right:12px;bottom:80px;width:260px;max-height:50vh;overflow-y:auto;transition:all .3s;z-index:15;border-radius:var(--r)}
-#sidebar.collapsed{width:40px;overflow:hidden}
-#sidebar.collapsed .sidebar-content{display:none}
-#sidebar-toggle{position:absolute;top:8px;right:8px;width:24px;height:24px;border-radius:50%;background:rgba(108,92,231,.3);border:none;color:var(--t);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;z-index:2}
-.sidebar-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--t2);margin-bottom:8px;padding-right:24px}
-.room-item{display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:6px;margin-bottom:2px;cursor:pointer;transition:all .2s;font-size:11px}
+
+/* Icon toolbar — left */
+#toolbar{position:absolute;left:12px;top:60px;display:flex;flex-direction:column;gap:4px;padding:8px;z-index:15;transition:opacity .3s}
+#toolbar.hidden{opacity:0;pointer-events:none}
+.tool{width:36px;height:36px;border-radius:8px;border:1px solid transparent;background:transparent;color:var(--t2);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;font-size:16px;position:relative}
+.tool:hover{background:rgba(108,92,231,.18);color:var(--t)}
+.tool.active{background:rgba(108,92,231,.3);color:var(--a2);border-color:rgba(108,92,231,.5)}
+.tool-sep{height:1px;background:var(--b);margin:4px 2px}
+.tool[data-tooltip]:hover::after{content:attr(data-tooltip);position:absolute;left:46px;top:50%;transform:translateY(-50%);background:var(--s2);padding:4px 8px;border-radius:6px;font-size:11px;white-space:nowrap;color:var(--t);border:1px solid var(--b);box-shadow:var(--shadow);z-index:100}
+
+/* Right sidebar */
+#sidebar{position:absolute;right:12px;top:60px;width:280px;max-height:calc(100vh - 140px);overflow-y:auto;transition:all .3s;z-index:15}
+#sidebar.hidden{display:none}
+.sidebar-section{padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid var(--b)}
+.sidebar-section:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0}
+.sidebar-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--t2);margin-bottom:8px}
+.room-item{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;margin-bottom:2px;cursor:pointer;transition:all .2s;font-size:11px}
 .room-item:hover{background:rgba(108,92,231,.15)}
-.room-color{width:10px;height:10px;border-radius:2px;flex-shrink:0}
-/* Bottom bar */
+.room-color{width:12px;height:12px;border-radius:3px;flex-shrink:0}
+.room-name{flex:1;font-weight:500}
+.room-dim{font-size:10px;color:var(--t2)}
+.metric{display:flex;justify-content:space-between;padding:4px 0;font-size:11px}
+.metric-val{color:var(--a2);font-weight:600}
+
+/* Bottom mode bar */
 #bottombar{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);display:flex;gap:4px;align-items:center;padding:6px 8px;border-radius:var(--r);transition:all .3s;z-index:15}
 #bottombar.hidden{opacity:0;pointer-events:none}
-.mode-btn{padding:6px 12px;border-radius:var(--rs);font-size:11px;font-weight:500;cursor:pointer;border:1px solid transparent;background:transparent;color:var(--t2);transition:all .2s;display:flex;align-items:center;gap:3px}
-.mode-btn:hover,.mode-btn.active{color:#fff;background:rgba(108,92,231,.25);border-color:rgba(108,92,231,.4)}
-.mode-sep{width:1px;height:16px;background:var(--b);margin:0 3px}
-/* Furniture panel */
-#furniture-panel{position:absolute;left:12px;bottom:80px;z-index:15;max-width:200px;transition:all .3s}
-#furniture-panel.hidden{opacity:0;pointer-events:none}
-.furniture-grid{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.mode-btn{padding:7px 13px;border-radius:var(--rs);font-size:11px;font-weight:500;cursor:pointer;border:1px solid transparent;background:transparent;color:var(--t2);transition:all .2s;display:flex;align-items:center;gap:4px}
+.mode-btn:hover,.mode-btn.active{color:var(--t);background:rgba(108,92,231,.22);border-color:rgba(108,92,231,.4)}
+.mode-sep{width:1px;height:18px;background:var(--b);margin:0 3px}
+
+/* Furniture floating panel */
+#furniture-panel{position:absolute;left:60px;top:60px;z-index:16;max-width:220px;transition:all .3s}
+#furniture-panel.hidden{opacity:0;pointer-events:none;transform:translateX(-8px)}
+.furniture-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:6px}
+
 /* Loading */
-#loading{position:fixed;inset:0;z-index:30;background:rgba(10,10,15,.9);display:flex;flex-direction:column;align-items:center;justify-content:center;transition:all .3s}
+#loading{position:fixed;inset:0;z-index:30;background:rgba(10,10,15,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .3s;backdrop-filter:blur(4px)}
+:root[data-theme="light"] #loading{background:rgba(244,245,249,.92)}
 #loading.hidden{opacity:0;pointer-events:none}
-.spinner{width:36px;height:36px;border:3px solid var(--b);border-top-color:var(--a);border-radius:50%;animation:spin .8s linear infinite;margin-bottom:10px}
+.skeleton{width:80px;height:80px;position:relative;margin-bottom:18px}
+.skeleton::before,.skeleton::after{content:'';position:absolute;inset:0;border-radius:50%;border:3px solid transparent;border-top-color:var(--a);animation:spin 1.2s cubic-bezier(.5,0,.5,1) infinite}
+.skeleton::after{border-top-color:var(--a2);animation-delay:.6s;inset:8px}
 @keyframes spin{to{transform:rotate(360deg)}}
-.loading-text{font-size:12px;color:var(--t2)}
-#stats{position:absolute;left:12px;top:80px;font-size:10px;color:var(--t2);display:flex;flex-direction:column;gap:3px;z-index:15;transition:all .3s;opacity:0}
-.stat-val{color:var(--a2);font-weight:600}
-.toast{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:100;padding:8px 16px;border-radius:var(--rs);background:var(--s1);border:1px solid var(--a);font-size:12px;animation:toastIn .3s ease}
+.loading-text{font-size:13px;color:var(--t);font-weight:500;margin-bottom:4px}
+.loading-sub{font-size:11px;color:var(--t2)}
+.loading-progress{margin-top:14px;display:flex;gap:6px}
+.loading-progress span{width:6px;height:6px;border-radius:50%;background:var(--b);animation:pulse 1.4s ease-in-out infinite}
+.loading-progress span:nth-child(2){animation-delay:.2s}
+.loading-progress span:nth-child(3){animation-delay:.4s}
+@keyframes pulse{0%,80%,100%{background:var(--b)}40%{background:var(--a)}}
+
+/* Stats */
+#stats{position:absolute;right:12px;bottom:12px;font-size:10px;color:var(--t2);display:flex;gap:8px;z-index:15;transition:opacity .3s;opacity:0;padding:6px 10px}
+.stat-val{color:var(--a2);font-weight:600;margin-left:3px}
+
+/* Toast */
+.toast{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:100;padding:10px 18px;border-radius:var(--rs);background:var(--s1);border:1px solid var(--a);font-size:12px;animation:toastIn .3s ease;max-width:90vw;color:var(--t);box-shadow:var(--shadow)}
+.toast.error{border-color:#e74c3c}
+.toast.success{border-color:#27ae60}
 @keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(-8px)}}
-/* Walk controls hint */
-#walk-hint{position:absolute;bottom:60px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--t2);background:rgba(20,20,31,.8);padding:4px 10px;border-radius:8px;display:none;z-index:20}
-::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:var(--b);border-radius:2px}
-input[type=file]{display:none}canvas{display:block}
+
+/* Walk mode */
+#walk-hint{position:absolute;bottom:60px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--t2);background:var(--panel);padding:5px 12px;border-radius:8px;display:none;z-index:20;border:1px solid var(--b)}
+#minimap{position:absolute;left:12px;bottom:12px;width:200px;height:160px;background:var(--panel);border:1px solid var(--b);border-radius:var(--rs);z-index:18;display:none;box-shadow:var(--shadow);overflow:hidden}
+#minimap canvas{width:100%;height:100%;display:block}
+
+/* Modals */
+.modal{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.modal.show{display:flex}
+.modal-inner{background:var(--s1);border:1px solid var(--b);border-radius:var(--r);padding:22px;max-width:480px;width:90vw;max-height:80vh;overflow-y:auto;box-shadow:var(--shadow)}
+.modal-title{font-size:16px;font-weight:700;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center}
+.modal-close{background:none;border:none;color:var(--t2);font-size:20px;cursor:pointer;padding:0;width:24px;height:24px}
+.field{margin-bottom:10px}
+.field label{display:block;font-size:11px;color:var(--t2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px}
+.field input,.field select{width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--b);background:var(--bg);color:var(--t);font-size:13px;font-family:inherit}
+.field input:focus,.field select:focus{outline:none;border-color:var(--a)}
+.field-row{display:flex;gap:8px}
+.field-row .field{flex:1}
+
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-thumb{background:var(--b);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--a)}
+input[type=file]{display:none}
+canvas{display:block}
 </style>
 </head>
 <body>
 <div id="viewer"></div>
-<div id="loading"><div class="spinner"></div><div class="loading-text" id="loading-text">Chargement...</div></div>
+
+<div id="loading">
+  <div class="skeleton"></div>
+  <div class="loading-text" id="loading-text">Chargement...</div>
+  <div class="loading-sub" id="loading-sub">Préparation de l'environnement 3D</div>
+  <div class="loading-progress"><span></span><span></span><span></span></div>
+</div>
+
 <div id="ui">
   <div id="header">
     <div class="logo"><span class="logo-icon">A</span>ArchiPlan AI</div>
     <div style="display:flex;gap:4px">
-      <button class="btn btn-o btn-xs" onclick="resetCamera()">🎯</button>
-      <button class="btn btn-o btn-xs" onclick="toggleFullscreen()">⛶</button>
+      <button class="btn btn-o btn-xs" id="btn-theme" data-tooltip="Thème" onclick="toggleTheme()" title="Basculer thème">🌓</button>
+      <button class="btn btn-o btn-xs" onclick="resetCamera()" title="Recadrer">🎯</button>
+      <button class="btn btn-o btn-xs" onclick="toggleFullscreen()" title="Plein écran">⛶</button>
     </div>
   </div>
 
@@ -85,24 +157,54 @@ input[type=file]{display:none}canvas{display:block}
     <div class="drop-area" id="drop-area">
       <div class="drop-icon">🏗️</div>
       <div class="drop-title">Déposez votre plan 2D</div>
-      <div class="drop-sub">PNG, JPG — IA analyse → 3D automatique</div>
+      <div class="drop-sub">PNG, JPG, WEBP — max 8 Mo</div>
     </div>
     <div class="or-divider">ou</div>
-    <button class="btn btn-g" onclick="loadDemo()" style="width:100%;justify-content:center">✨ Démo</button>
+    <button class="btn btn-g" onclick="loadDemo()" style="width:100%;justify-content:center">✨ Charger la démo</button>
     <input type="file" id="file-input" accept="image/*" onchange="uploadFile(this.files[0])">
   </div>
 
+  <!-- Left icon toolbar -->
+  <div id="toolbar" class="panel hidden">
+    <button class="tool" data-tooltip="Pièces & infos" onclick="toggleSidebar()">📋</button>
+    <button class="tool" data-tooltip="Meubles" onclick="toggleFurniturePanel()">🪑</button>
+    <button class="tool" data-tooltip="Murs on/off" id="tool-walls" onclick="toggleWalls()">🧱</button>
+    <button class="tool" data-tooltip="Jour / Nuit" id="tool-daynight" onclick="toggleDayNight()">☀️</button>
+    <div class="tool-sep"></div>
+    <button class="tool" data-tooltip="Export OBJ" onclick="exportOBJ()">📦</button>
+    <button class="tool" data-tooltip="Export glTF" onclick="exportGLTF()">📐</button>
+    <button class="tool" data-tooltip="Screenshot PNG" onclick="exportScreenshot()">📸</button>
+    <button class="tool" data-tooltip="Rapport JSON" onclick="exportReport()">📊</button>
+    <div class="tool-sep"></div>
+    <button class="tool" data-tooltip="Coût construction" onclick="openCostModal()">💶</button>
+    <button class="tool" data-tooltip="Modifier pièce" onclick="openEditModal()">✏️</button>
+    <div class="tool-sep"></div>
+    <button class="tool" data-tooltip="Réinitialiser" onclick="resetScene()">🔄</button>
+  </div>
+
+  <!-- Right sidebar with rooms + metrics -->
   <div id="sidebar" class="panel hidden">
-    <button id="sidebar-toggle" onclick="toggleSidebar()">−</button>
-    <div class="sidebar-content">
+    <div class="sidebar-section">
       <div class="sidebar-title">Pièces</div>
       <div id="room-list"></div>
-      <div style="margin-top:8px;padding-top:6px;border-top:1px solid var(--b);font-size:10px;color:var(--t2)">Total: <span id="total-area" style="color:var(--a2);font-weight:600">—</span> m²</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-title">Surface</div>
+      <div class="metric"><span>Habitable</span><span class="metric-val"><span id="surface-habitable">—</span> m²</span></div>
+      <div class="metric"><span>Plancher</span><span class="metric-val"><span id="surface-plancher">—</span> m²</span></div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-title">Structure</div>
+      <div class="metric"><span>Murs</span><span class="metric-val" id="cnt-walls">—</span></div>
+      <div class="metric"><span>Portes</span><span class="metric-val" id="cnt-doors">—</span></div>
+      <div class="metric"><span>Fenêtres</span><span class="metric-val" id="cnt-windows">—</span></div>
+      <div class="metric"><span>Meubles</span><span class="metric-val" id="cnt-furniture">—</span></div>
     </div>
   </div>
 
+  <!-- Furniture panel -->
   <div id="furniture-panel" class="panel hidden">
-    <div class="sidebar-title" style="margin-bottom:4px">🪑 Meubles</div>
+    <div class="sidebar-title">🪑 Ajouter un meuble</div>
     <div class="furniture-grid">
       <button class="furniture-btn" onclick="addFurniture('table')">🍽️ Table</button>
       <button class="furniture-btn" onclick="addFurniture('chair')">🪑 Chaise</button>
@@ -112,343 +214,663 @@ input[type=file]{display:none}canvas{display:block}
       <button class="furniture-btn" onclick="addFurniture('bathtub')">🛁 Baignoire</button>
       <button class="furniture-btn" onclick="addFurniture('desk')">📚 Bureau</button>
       <button class="furniture-btn" onclick="addFurniture('plant')">🌿 Plante</button>
+      <button class="furniture-btn" onclick="addFurniture('tv')">📺 TV</button>
+      <button class="furniture-btn" onclick="addFurniture('wardrobe')">🚪 Armoire</button>
     </div>
-    <button class="btn btn-danger btn-xs" onclick="clearFurniture()" style="margin-top:6px;width:100%">🗑️ Supprimer meubles</button>
+    <div style="font-size:10px;color:var(--t2);margin-top:6px;line-height:1.4">💡 Cliquez-glissez un meuble en mode Orbite pour le déplacer.</div>
+    <button class="btn btn-danger btn-xs" onclick="clearFurniture()" style="margin-top:6px;width:100%">🗑️ Tout supprimer</button>
   </div>
 
+  <!-- Bottom mode bar -->
   <div id="bottombar" class="panel hidden">
     <button class="mode-btn active" id="btn-orbit" onclick="setMode('orbit')">🖱️ Orbite</button>
     <button class="mode-btn" id="btn-walk" onclick="setMode('walk')">🚶 Visite</button>
     <div class="mode-sep"></div>
     <button class="mode-btn active" id="btn-walls" onclick="toggleWalls()">🧱 Murs</button>
     <button class="mode-btn" id="btn-furniture" onclick="toggleFurniturePanel()">🪑 Meubles</button>
-    <div class="mode-sep"></div>
-    <button class="btn btn-o btn-xs" onclick="resetScene()">🔄</button>
   </div>
 
-  <div id="stats">Murs:<span class="stat-val" id="stat-walls">—</span> | Portes:<span class="stat-val" id="stat-doors">—</span> | Fenêtres:<span class="stat-val" id="stat-windows">—</span> | <span class="stat-val" id="stat-area">—</span>m²</div>
-  <div id="walk-hint">WASD = Déplacement | Souris = Regarder | R = Reset</div>
+  <div id="stats" class="panel">
+    Pièces<span class="stat-val" id="stat-rooms">—</span> ·
+    Murs<span class="stat-val" id="stat-walls">—</span> ·
+    Portes<span class="stat-val" id="stat-doors">—</span> ·
+    Fenêtres<span class="stat-val" id="stat-windows">—</span> ·
+    Surface<span class="stat-val" id="stat-area">—</span>m²
+  </div>
+
+  <div id="walk-hint">WASD = Déplacement · Souris = Regarder · Shift = Courir · Esc = Quitter</div>
+  <div id="minimap"><canvas id="minimap-canvas" width="400" height="320"></canvas></div>
+</div>
+
+<!-- Modal coût -->
+<div class="modal" id="cost-modal">
+  <div class="modal-inner">
+    <div class="modal-title">💶 Estimation du coût <button class="modal-close" onclick="closeModal('cost-modal')">×</button></div>
+    <div class="field">
+      <label>Prix au m² (€)</label>
+      <input type="number" id="price-m2" value="1800" min="100" step="50">
+    </div>
+    <div id="cost-result" style="font-size:13px;line-height:1.8;padding:12px;background:var(--bg);border-radius:8px;border:1px solid var(--b)"></div>
+    <button class="btn btn-g" onclick="calculateCost()" style="margin-top:12px;width:100%">Calculer</button>
+  </div>
+</div>
+
+<!-- Modal édition pièce -->
+<div class="modal" id="edit-modal">
+  <div class="modal-inner">
+    <div class="modal-title">✏️ Modifier une pièce <button class="modal-close" onclick="closeModal('edit-modal')">×</button></div>
+    <div class="field">
+      <label>Pièce</label>
+      <select id="edit-room-select"></select>
+    </div>
+    <div class="field"><label>Nom</label><input type="text" id="edit-name"></div>
+    <div class="field-row">
+      <div class="field"><label>Largeur (m)</label><input type="number" id="edit-width" step="0.1" min="1"></div>
+      <div class="field"><label>Profondeur (m)</label><input type="number" id="edit-depth" step="0.1" min="1"></div>
+    </div>
+    <button class="btn btn-g" onclick="applyRoomEdit()" style="width:100%">Appliquer</button>
+  </div>
 </div>
 
 <script type="importmap">
-{ "imports": { "three": "https://unpkg.com/three@0.150.1/build/three.module.js", "three/addons/": "https://unpkg.com/three@0.150.1/examples/jsm/" } }
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.150.1/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.150.1/examples/jsm/"
+  }
+}
 </script>
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+import { OBJExporter } from 'three/addons/exporters/OBJExporter.js';
 
 // ─── STATE ───
-let scene, camera, renderer, controls;
-let modelGroup, wallsGroup, roomsGroup, doorsGroup, furnitureGroup;
-let floorMesh, modelData, hoveredRoom;
-let showWalls = true, mode = 'orbit', sidebarOpen = true;
-let raycaster, mouse, isLoading = false, isWalkMode = false;
-let walkKeys = {}, walkVelocity = new THREE.Vector3();
-let euler = new THREE.Euler(0,0,0,'YXZ');
-let furnitureItems = [];
+const state = {
+  scene: null, camera: null, renderer: null, controls: null,
+  modelGroup: null, wallsGroup: null, roomsGroup: null, doorsGroup: null,
+  windowsGroup: null, furnitureGroup: null, floorMesh: null,
+  modelData: null, fileId: null,
+  hoveredRoom: null, draggedFurniture: null,
+  showWalls: true, mode: 'orbit', isWalkMode: false, isLoading: false,
+  dayNight: 'day',
+  walkKeys: {}, walkVel: new THREE.Vector3(),
+  euler: new THREE.Euler(0, 0, 0, 'YXZ'),
+  furnitureItems: [],
+  raycaster: null, mouse: new THREE.Vector2(),
+  sun: null, ambient: null, hemi: null,
+  minimapCtx: null,
+  textures: {},
+};
+
+const COLORS = ['#f4a460','#7ec850','#68a0d8','#c080d0','#50c8b8','#e8a040','#60b880','#5890d0','#b870c8','#48b8a8'];
+
+// ─── THEME ───
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('archiplan-theme', theme);
+  if (state.scene) {
+    if (theme === 'light') {
+      state.scene.background = new THREE.Color('#dde0e6');
+      state.scene.fog = new THREE.Fog('#dde0e6', 25, 80);
+    } else {
+      state.scene.background = new THREE.Color('#0a0a14');
+      state.scene.fog = new THREE.Fog('#0a0a14', 15, 50);
+    }
+  }
+}
+window.toggleTheme = () => {
+  const cur = document.documentElement.getAttribute('data-theme') || 'dark';
+  applyTheme(cur === 'dark' ? 'light' : 'dark');
+};
+applyTheme(localStorage.getItem('archiplan-theme') || 'dark');
+
+// ─── TEXTURES PROCÉDURALES ───
+function makeParquetTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+  // base
+  ctx.fillStyle = '#a06b35';
+  ctx.fillRect(0, 0, 512, 512);
+  // lames
+  const plankH = 64, plankW = 180;
+  for (let y = 0; y < 512; y += plankH) {
+    const offset = (y / plankH) % 2 === 0 ? 0 : plankW / 2;
+    for (let x = -plankW; x < 512 + plankW; x += plankW) {
+      const px = x + offset;
+      // teinte aléatoire
+      const shade = 70 + Math.floor(Math.random() * 60);
+      ctx.fillStyle = `rgb(${shade + 90},${shade + 40},${Math.floor(shade / 2)})`;
+      ctx.fillRect(px, y, plankW - 2, plankH - 2);
+      // veines
+      ctx.strokeStyle = `rgba(60,40,20,${0.15 + Math.random() * 0.2})`;
+      ctx.lineWidth = 0.7;
+      for (let v = 0; v < 4; v++) {
+        ctx.beginPath();
+        ctx.moveTo(px, y + Math.random() * plankH);
+        ctx.bezierCurveTo(px + plankW * 0.3, y + Math.random() * plankH,
+                          px + plankW * 0.6, y + Math.random() * plankH,
+                          px + plankW, y + Math.random() * plankH);
+        ctx.stroke();
+      }
+    }
+    // ligne horizontale
+    ctx.strokeStyle = 'rgba(40,25,10,.6)';
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(512, y); ctx.stroke();
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(3, 3);
+  return tex;
+}
+
+function makeWallTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#f0ebe0';
+  ctx.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 1500; i++) {
+    const x = Math.random() * 256, y = Math.random() * 256;
+    ctx.fillStyle = `rgba(${200 + Math.random() * 30},${190 + Math.random() * 30},${175 + Math.random() * 20},${0.3 + Math.random() * 0.3})`;
+    ctx.fillRect(x, y, 1, 1);
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  return tex;
+}
 
 // ─── INIT ───
 function initScene() {
-  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.2;
-  document.getElementById('viewer').appendChild(renderer.domElement);
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  state.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: true });
+  state.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  state.renderer.setSize(window.innerWidth, window.innerHeight);
+  state.renderer.shadowMap.enabled = true;
+  state.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  state.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  state.renderer.toneMappingExposure = 1.15;
+  document.getElementById('viewer').appendChild(state.renderer.domElement);
 
-  scene = new THREE.Scene();
-  scene.background = new THREE.Color('#0a0a14');
-  scene.fog = new THREE.Fog('#0a0a14', 15, 50);
+  state.scene = new THREE.Scene();
+  state.scene.background = new THREE.Color(isLight ? '#dde0e6' : '#0a0a14');
+  state.scene.fog = new THREE.Fog(isLight ? '#dde0e6' : '#0a0a14', isLight ? 25 : 15, isLight ? 80 : 50);
 
-  camera = new THREE.PerspectiveCamera(55, window.innerWidth/window.innerHeight, 0.3, 100);
-  camera.position.set(8, 12, 14);
+  state.camera = new THREE.PerspectiveCamera(55, window.innerWidth/window.innerHeight, 0.3, 200);
+  state.camera.position.set(8, 12, 14);
 
-  controls = new OrbitControls(camera, renderer.domElement);
-  controls.enableDamping = true;
-  controls.dampingFactor = 0.08;
-  controls.target.set(5, 0, 4);
-  controls.minDistance = 1.5;
-  controls.maxDistance = 30;
-  controls.maxPolarAngle = Math.PI/2.3;
-  controls.update();
+  state.controls = new OrbitControls(state.camera, state.renderer.domElement);
+  state.controls.enableDamping = true;
+  state.controls.dampingFactor = 0.08;
+  state.controls.target.set(5, 0, 4);
+  state.controls.minDistance = 1.5;
+  state.controls.maxDistance = 50;
+  state.controls.maxPolarAngle = Math.PI / 2.2;
 
   // Lights
-  scene.add(new THREE.AmbientLight('#b8c8ff', 1.2));
-  const sun = new THREE.DirectionalLight('#fff8e8', 3.5);
-  sun.position.set(10, 15, 5); sun.castShadow = true;
-  sun.shadow.mapSize.set(2048,2048); sun.shadow.camera.near=0.5; sun.shadow.camera.far=60;
-  sun.shadow.camera.left=-20;sun.shadow.camera.right=20;sun.shadow.camera.top=20;sun.shadow.camera.bottom=-20;
-  scene.add(sun);
-  scene.add(new THREE.HemisphereLight('#8899cc','#332244', .5));
+  state.ambient = new THREE.AmbientLight('#b8c8ff', 0.9);
+  state.scene.add(state.ambient);
+  state.sun = new THREE.DirectionalLight('#fff8e8', 3.0);
+  state.sun.position.set(10, 18, 6);
+  state.sun.castShadow = true;
+  state.sun.shadow.mapSize.set(2048, 2048);
+  state.sun.shadow.camera.near = 0.5;
+  state.sun.shadow.camera.far = 80;
+  state.sun.shadow.camera.left = -25; state.sun.shadow.camera.right = 25;
+  state.sun.shadow.camera.top = 25; state.sun.shadow.camera.bottom = -25;
+  state.scene.add(state.sun);
+  state.hemi = new THREE.HemisphereLight('#aabbff', '#332244', 0.45);
+  state.scene.add(state.hemi);
 
   // Grid
-  const grid = new THREE.PolarGridHelper(20,40,30,128,'#1a1a3a','#1a1a3a');
-  grid.position.y=-.01; scene.add(grid);
+  const grid = new THREE.PolarGridHelper(20, 40, 30, 128, '#1a1a3a', isLight ? '#a0a8b0' : '#1a1a3a');
+  grid.position.y = -0.01;
+  state.scene.add(grid);
 
-  // Groups
-  modelGroup = new THREE.Group(); wallsGroup = new THREE.Group();
-  roomsGroup = new THREE.Group(); doorsGroup = new THREE.Group();
-  furnitureGroup = new THREE.Group();
-  scene.add(modelGroup);
-  modelGroup.add(wallsGroup, roomsGroup, doorsGroup, furnitureGroup);
+  state.modelGroup = new THREE.Group();
+  state.wallsGroup = new THREE.Group();
+  state.roomsGroup = new THREE.Group();
+  state.doorsGroup = new THREE.Group();
+  state.windowsGroup = new THREE.Group();
+  state.furnitureGroup = new THREE.Group();
+  state.modelGroup.add(state.wallsGroup, state.roomsGroup, state.doorsGroup, state.windowsGroup, state.furnitureGroup);
+  state.scene.add(state.modelGroup);
 
-  raycaster = new THREE.Raycaster(); mouse = new THREE.Vector2();
+  state.raycaster = new THREE.Raycaster();
+
+  state.textures.parquet = makeParquetTexture();
+  state.textures.wall = makeWallTexture();
+
+  state.minimapCtx = document.getElementById('minimap-canvas').getContext('2d');
 
   // Events
   window.addEventListener('resize', onResize);
-  window.addEventListener('mousemove', onMouseMove);
   window.addEventListener('keydown', onKeyDown);
   window.addEventListener('keyup', onKeyUp);
-  renderer.domElement.addEventListener('click', onClick);
+  state.renderer.domElement.addEventListener('mousemove', onMouseMove);
+  state.renderer.domElement.addEventListener('mousedown', onMouseDown);
+  state.renderer.domElement.addEventListener('mouseup', onMouseUp);
+  state.renderer.domElement.addEventListener('click', onClick);
   document.addEventListener('pointerlockchange', onPointerLockChange);
 
-  // Drag & drop
+  // Drag & drop upload
   const dropArea = document.getElementById('drop-area');
-  dropArea.addEventListener('click', e => { e.stopPropagation(); document.getElementById('file-input').click(); });
-  ['dragover','dragenter'].forEach(ev => dropArea.addEventListener(ev, e => { e.preventDefault(); dropArea.classList.add('drag'); }));
-  ['dragleave','drop'].forEach(ev => dropArea.addEventListener(ev, e => { e.preventDefault(); dropArea.classList.remove('drag'); }));
-  dropArea.addEventListener('drop', e => { const f = e.dataTransfer.files[0]; if(f) uploadFile(f); });
+  dropArea.addEventListener('click', e => {
+    e.stopPropagation();
+    document.getElementById('file-input').click();
+  });
+  ['dragover','dragenter'].forEach(ev => dropArea.addEventListener(ev, e => {
+    e.preventDefault(); dropArea.classList.add('drag');
+  }));
+  ['dragleave','drop'].forEach(ev => dropArea.addEventListener(ev, e => {
+    e.preventDefault(); dropArea.classList.remove('drag');
+  }));
+  dropArea.addEventListener('drop', e => {
+    const f = e.dataTransfer.files[0]; if (f) uploadFile(f);
+  });
 
   hideLoading();
   animate();
-  console.log('ArchiPlan AI v3 ready ✓');
+  console.log('ArchiPlan AI v2 prêt ✓');
 }
 
-// ─── RENDER ───
+// ─── RENDER LOOP ───
 function animate() {
   requestAnimationFrame(animate);
-  
-  if (isWalkMode) {
+  if (state.isWalkMode) {
     updateWalk();
+    drawMinimap();
   } else {
-    controls.update();
-  }
-  
-  if (roomsGroup.children.length > 0 && !isWalkMode) {
-    raycaster.setFromCamera(mouse, camera);
-    const hits = raycaster.intersectObjects(roomsGroup.children);
-    if (hits.length > 0) {
-      const obj = hits[0].object;
-      if (hoveredRoom !== obj) {
-        if (hoveredRoom) { hoveredRoom.material.emissive?.setHex(0); hoveredRoom.material.emissiveIntensity = 0; }
-        hoveredRoom = obj;
-        hoveredRoom.material.emissive?.set('#2a2050');
-        hoveredRoom.material.emissiveIntensity = 0.5;
+    state.controls.update();
+    if (state.roomsGroup.children.length > 0 && !state.draggedFurniture) {
+      state.raycaster.setFromCamera(state.mouse, state.camera);
+      const hits = state.raycaster.intersectObjects(state.roomsGroup.children);
+      if (hits.length > 0) {
+        const obj = hits[0].object;
+        if (state.hoveredRoom !== obj) {
+          if (state.hoveredRoom?.material?.emissive) {
+            state.hoveredRoom.material.emissive.setHex(0);
+            state.hoveredRoom.material.emissiveIntensity = 0;
+          }
+          state.hoveredRoom = obj;
+          if (state.hoveredRoom.material.emissive) {
+            state.hoveredRoom.material.emissive.set('#3a2870');
+            state.hoveredRoom.material.emissiveIntensity = 0.4;
+          }
+        }
+      } else if (state.hoveredRoom) {
+        if (state.hoveredRoom.material.emissive) {
+          state.hoveredRoom.material.emissive.setHex(0);
+          state.hoveredRoom.material.emissiveIntensity = 0;
+        }
+        state.hoveredRoom = null;
       }
-    } else if (hoveredRoom) {
-      hoveredRoom.material.emissive?.setHex(0);
-      hoveredRoom.material.emissiveIntensity = 0;
-      hoveredRoom = null;
     }
   }
-  
-  renderer.render(scene, camera);
+  state.renderer.render(state.scene, state.camera);
 }
 
-// ─── WALK MODE ───
+// ─── WALK MODE + COLLISION ───
 function updateWalk() {
-  const speed = 5;
+  const sprint = state.walkKeys['shift'] ? 1.7 : 1;
+  const speed = 3.5 * sprint;
   const dir = new THREE.Vector3();
-  if (walkKeys['w'] || walkKeys['arrowup']) dir.z = -1;
-  if (walkKeys['s'] || walkKeys['arrowdown']) dir.z = 1;
-  if (walkKeys['a'] || walkKeys['arrowleft']) dir.x = -1;
-  if (walkKeys['d'] || walkKeys['arrowright']) dir.x = 1;
-  
+  if (state.walkKeys['w'] || state.walkKeys['arrowup']) dir.z = -1;
+  if (state.walkKeys['s'] || state.walkKeys['arrowdown']) dir.z = 1;
+  if (state.walkKeys['a'] || state.walkKeys['arrowleft']) dir.x = -1;
+  if (state.walkKeys['d'] || state.walkKeys['arrowright']) dir.x = 1;
+  if (dir.lengthSq() === 0) return;
   dir.normalize().multiplyScalar(speed * 0.016);
-  dir.applyEuler(new THREE.Euler(0, euler.y, 0));
-  camera.position.add(dir);
-  camera.position.y = 1.6; // eye height
+  dir.applyEuler(new THREE.Euler(0, state.euler.y, 0));
+
+  // Collision avec les murs : tester X et Z séparément (slide le long des murs)
+  const colliders = state.wallsGroup.children;
+  if (colliders.length > 0) {
+    const margin = 0.35;
+    const next = state.camera.position.clone();
+
+    // tester X
+    const probeX = next.clone(); probeX.x += dir.x;
+    if (!collides(probeX, margin, colliders)) state.camera.position.x += dir.x;
+
+    // tester Z
+    const probeZ = state.camera.position.clone(); probeZ.z += dir.z;
+    if (!collides(probeZ, margin, colliders)) state.camera.position.z += dir.z;
+  } else {
+    state.camera.position.add(dir);
+  }
+  state.camera.position.y = 1.6;
+}
+
+function collides(pos, margin, colliders) {
+  const dirs = [
+    new THREE.Vector3(1,0,0), new THREE.Vector3(-1,0,0),
+    new THREE.Vector3(0,0,1), new THREE.Vector3(0,0,-1),
+  ];
+  const origin = pos.clone(); origin.y = 1.0;
+  for (const d of dirs) {
+    state.raycaster.set(origin, d);
+    state.raycaster.far = margin;
+    const hits = state.raycaster.intersectObjects(colliders, false);
+    if (hits.length > 0) return true;
+  }
+  return false;
 }
 
 function setMode(m) {
-  mode = m;
-  document.getElementById('btn-orbit').classList.toggle('active', m==='orbit');
-  document.getElementById('btn-walk').classList.toggle('active', m==='walk');
-  
+  state.mode = m;
+  document.getElementById('btn-orbit').classList.toggle('active', m === 'orbit');
+  document.getElementById('btn-walk').classList.toggle('active', m === 'walk');
+
   if (m === 'walk') {
-    isWalkMode = true;
-    controls.enabled = false;
+    state.isWalkMode = true;
+    state.controls.enabled = false;
     document.getElementById('walk-hint').style.display = 'block';
-    camera.position.y = 1.6;
-    renderer.domElement.requestPointerLock();
-  } else {
-    isWalkMode = false;
-    controls.enabled = true;
-    controls.target.copy(camera.position.clone().add(new THREE.Vector3(0,0,-3).applyQuaternion(camera.quaternion)));
-    document.getElementById('walk-hint').style.display = 'none';
-    document.exitPointerLock();
-    if (modelData) {
-      const tw = (modelData.metadata||{}).total_width || 10;
-      const td = (modelData.metadata||{}).total_depth || 8;
-      camera.position.set(tw/2, Math.max(tw,td)*.7, td*1.3);
-      controls.target.set(tw/2, 0, td/2);
+    document.getElementById('minimap').style.display = 'block';
+    // Position de départ : centre de la première pièce
+    const r = state.modelData?.rooms?.[0];
+    if (r) {
+      state.camera.position.set(r.x + r.width/2, 1.6, r.z + r.depth/2);
+    } else {
+      state.camera.position.y = 1.6;
     }
-    controls.update();
+    state.euler.set(0, 0, 0);
+    state.camera.quaternion.setFromEuler(state.euler);
+    state.renderer.domElement.requestPointerLock();
+  } else {
+    state.isWalkMode = false;
+    state.controls.enabled = true;
+    document.getElementById('walk-hint').style.display = 'none';
+    document.getElementById('minimap').style.display = 'none';
+    document.exitPointerLock();
+    if (state.modelData) {
+      const meta = state.modelData.metadata || {};
+      const tw = meta.total_width || 10, td = meta.total_depth || 8;
+      state.camera.position.set(tw/2, Math.max(tw,td)*0.7, td*1.3);
+      state.controls.target.set(tw/2, 0, td/2);
+    }
+    state.controls.update();
   }
 }
 
 function onPointerLockChange() {
-  if (!document.pointerLockElement && isWalkMode) {
-    // stay in walk mode until user presses escape then click
+  // si on perd le pointer lock alors qu'on est en mode walk, on reste prêt
+}
+
+// ─── MINIMAP ───
+function drawMinimap() {
+  if (!state.modelData || !state.minimapCtx) return;
+  const ctx = state.minimapCtx;
+  const w = ctx.canvas.width, h = ctx.canvas.height;
+  ctx.clearRect(0, 0, w, h);
+  const meta = state.modelData.metadata || {};
+  const tw = meta.total_width || 10, td = meta.total_depth || 8;
+  const scale = Math.min(w / (tw + 1), h / (td + 1));
+  const ox = (w - tw * scale) / 2;
+  const oy = (h - td * scale) / 2;
+  // pièces
+  (state.modelData.rooms || []).forEach((r, i) => {
+    ctx.fillStyle = r.color || COLORS[i % COLORS.length];
+    ctx.globalAlpha = 0.5;
+    ctx.fillRect(ox + r.x * scale, oy + r.z * scale, r.width * scale, r.depth * scale);
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = 'rgba(0,0,0,.4)';
+    ctx.strokeRect(ox + r.x * scale, oy + r.z * scale, r.width * scale, r.depth * scale);
+  });
+  // murs (très fins)
+  ctx.strokeStyle = 'rgba(0,0,0,.7)';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(ox, oy, tw * scale, td * scale);
+  // joueur
+  const px = ox + state.camera.position.x * scale;
+  const pz = oy + state.camera.position.z * scale;
+  ctx.fillStyle = '#e74c3c';
+  ctx.beginPath(); ctx.arc(px, pz, 5, 0, Math.PI * 2); ctx.fill();
+  // direction
+  const dx = Math.sin(state.euler.y) * 12;
+  const dz = Math.cos(state.euler.y) * 12;
+  ctx.strokeStyle = '#e74c3c';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(px, pz); ctx.lineTo(px - dx, pz - dz); ctx.stroke();
+}
+
+// ─── DAY / NIGHT ───
+window.toggleDayNight = function() {
+  state.dayNight = state.dayNight === 'day' ? 'night' : 'day';
+  if (state.dayNight === 'day') {
+    state.sun.color.set('#fff8e8'); state.sun.intensity = 3.0;
+    state.ambient.color.set('#b8c8ff'); state.ambient.intensity = 0.9;
+    state.hemi.intensity = 0.45;
+    document.getElementById('tool-daynight').textContent = '☀️';
+  } else {
+    state.sun.color.set('#5070a0'); state.sun.intensity = 0.4;
+    state.ambient.color.set('#202040'); state.ambient.intensity = 0.5;
+    state.hemi.intensity = 0.15;
+    document.getElementById('tool-daynight').textContent = '🌙';
+  }
+};
+
+// ─── INPUT HANDLERS ───
+function onMouseMove(e) {
+  if (state.isWalkMode) {
+    if (document.pointerLockElement) {
+      state.euler.setFromQuaternion(state.camera.quaternion);
+      state.euler.y -= e.movementX * 0.002;
+      state.euler.x -= e.movementY * 0.002;
+      state.euler.x = Math.max(-Math.PI/2.2, Math.min(Math.PI/2.2, state.euler.x));
+      state.camera.quaternion.setFromEuler(state.euler);
+    }
+    return;
+  }
+  state.mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+  state.mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+  // drag furniture
+  if (state.draggedFurniture) {
+    const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    state.raycaster.setFromCamera(state.mouse, state.camera);
+    const hit = new THREE.Vector3();
+    if (state.raycaster.ray.intersectPlane(plane, hit)) {
+      state.draggedFurniture.position.x = hit.x;
+      state.draggedFurniture.position.z = hit.z;
+    }
   }
 }
 
-function onMouseMove(e) {
-  if (isWalkMode) {
-    euler.setFromQuaternion(camera.quaternion);
-    euler.y -= e.movementX * 0.002;
-    euler.x -= e.movementY * 0.002;
-    euler.x = Math.max(-Math.PI/2.2, Math.min(Math.PI/2.2, euler.x));
-    camera.quaternion.setFromEuler(euler);
+function onMouseDown(e) {
+  if (state.isWalkMode || e.button !== 0) return;
+  state.mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+  state.mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+  state.raycaster.setFromCamera(state.mouse, state.camera);
+  const hits = state.raycaster.intersectObjects(state.furnitureGroup.children, true);
+  if (hits.length > 0) {
+    // Trouver le groupe parent (le meuble)
+    let obj = hits[0].object;
+    while (obj.parent && !obj.userData.isFurniture) obj = obj.parent;
+    if (obj.userData.isFurniture) {
+      state.draggedFurniture = obj;
+      state.controls.enabled = false;
+    }
   }
-  mouse.x = (e.clientX/window.innerWidth)*2-1;
-  mouse.y = -(e.clientY/window.innerHeight)*2+1;
+}
+
+function onMouseUp(e) {
+  if (state.draggedFurniture) {
+    state.draggedFurniture = null;
+    state.controls.enabled = !state.isWalkMode;
+  }
 }
 
 function onKeyDown(e) {
-  walkKeys[e.key.toLowerCase()] = true;
-  if (e.key === 'r' || e.key === 'R') resetCamera();
-  if (e.key === 'Escape' && isWalkMode) setMode('orbit');
+  state.walkKeys[e.key.toLowerCase()] = true;
+  if (e.key === 'Escape' && state.isWalkMode) setMode('orbit');
+  if (e.key.toLowerCase() === 'r' && !state.isWalkMode) resetCamera();
 }
-
-function onKeyUp(e) { walkKeys[e.key.toLowerCase()] = false; }
+function onKeyUp(e) { state.walkKeys[e.key.toLowerCase()] = false; }
 
 function onClick(e) {
-  if (isWalkMode) {
-    renderer.domElement.requestPointerLock();
+  if (state.isWalkMode && !document.pointerLockElement) {
+    state.renderer.domElement.requestPointerLock();
     return;
   }
-  if (hoveredRoom && mode === 'orbit') {
-    focusRoom(hoveredRoom.userData?.room);
+  if (state.hoveredRoom && state.mode === 'orbit' && !state.draggedFurniture) {
+    focusRoom(state.hoveredRoom.userData?.room);
   }
 }
 
-// ─── BUILD ───
+// ─── BUILD SCENE ───
 function buildScene(data) {
-  [wallsGroup, roomsGroup, doorsGroup, furnitureGroup].forEach(g => { while(g.children.length) g.remove(g.children[0]); });
-  if (floorMesh) { modelGroup.remove(floorMesh); floorMesh = null; }
-  furnitureItems = [];
-  hoveredRoom = null;
-  modelData = data;
-  
+  [state.wallsGroup, state.roomsGroup, state.doorsGroup, state.windowsGroup, state.furnitureGroup].forEach(g => {
+    while (g.children.length) {
+      const c = g.children[0];
+      g.remove(c);
+      c.geometry?.dispose?.();
+      c.material?.dispose?.();
+    }
+  });
+  if (state.floorMesh) {
+    state.modelGroup.remove(state.floorMesh);
+    state.floorMesh.geometry.dispose();
+    state.floorMesh.material.dispose();
+    state.floorMesh = null;
+  }
+  state.furnitureItems = [];
+  state.hoveredRoom = null;
+  state.modelData = data;
+
   const meta = data.metadata || {};
   const h = meta.wall_height || 2.7;
   const thick = 0.15;
   const tw = meta.total_width || 10, td = meta.total_depth || 8;
 
-  // Floor
+  // Floor with parquet texture
   const fg = new THREE.PlaneGeometry(tw, td);
-  const fm = new THREE.MeshStandardMaterial({ color:'#c8b898', roughness:.7 });
-  floorMesh = new THREE.Mesh(fg, fm);
-  floorMesh.rotation.x = -Math.PI/2;
-  floorMesh.position.set(tw/2, 0.001, td/2);
-  floorMesh.receiveShadow = true;
-  modelGroup.add(floorMesh);
+  const parq = state.textures.parquet.clone();
+  parq.needsUpdate = true;
+  parq.repeat.set(tw / 3, td / 3);
+  const fm = new THREE.MeshStandardMaterial({ map: parq, roughness: 0.6, metalness: 0.05 });
+  state.floorMesh = new THREE.Mesh(fg, fm);
+  state.floorMesh.rotation.x = -Math.PI / 2;
+  state.floorMesh.position.set(tw/2, 0.001, td/2);
+  state.floorMesh.receiveShadow = true;
+  state.modelGroup.add(state.floorMesh);
 
-  // Rooms
-  const colors = ['#f4a460','#7ec850','#68a0d8','#c080d0','#50c8b8','#e8a040','#60b880','#5890d0','#b870c8','#48b8a8'];
-  let totalArea = 0;
-  (data.rooms||[]).forEach((room,i) => {
-    const rw = room.width||3, rd = room.depth||3;
-    totalArea += rw * rd;
-    const g = new THREE.BoxGeometry(rw-.15, .25, rd-.15);
-    const color = room.color || colors[i%colors.length];
-    const m = new THREE.MeshStandardMaterial({ color, roughness:.4, emissive:color, emissiveIntensity:.15 });
+  // Rooms (sol coloré au-dessus du parquet)
+  (data.rooms || []).forEach((room, i) => {
+    const rw = room.width || 3, rd = room.depth || 3;
+    const g = new THREE.BoxGeometry(rw - 0.15, 0.04, rd - 0.15);
+    const color = room.color || COLORS[i % COLORS.length];
+    const m = new THREE.MeshStandardMaterial({
+      color, roughness: 0.55, transparent: true, opacity: 0.35,
+    });
     const mesh = new THREE.Mesh(g, m);
-    mesh.position.set(room.x+rw/2, .13, room.z+rd/2);
-    mesh.castShadow = true; mesh.receiveShadow = true;
-    mesh.userData = { room, i };
-    roomsGroup.add(mesh);
+    mesh.position.set(room.x + rw/2, 0.02, room.z + rd/2);
+    mesh.receiveShadow = true;
+    mesh.userData = { room, idx: i };
+    state.roomsGroup.add(mesh);
   });
-  console.log('Total area:', totalArea.toFixed(1), 'm²');
 
   // Walls
-  (data.walls||[]).forEach(w => {
-    const g = new THREE.BoxGeometry(1, h, thick);
-    const m = new THREE.MeshStandardMaterial({ color:'#f5f0e8', roughness:.55 });
-    const mesh = new THREE.Mesh(g, m);
-    mesh.scale.set(w.length, 1, 1);
+  const wallMat = new THREE.MeshStandardMaterial({
+    map: state.textures.wall, color: '#f5f0e8', roughness: 0.7,
+  });
+  (data.walls || []).forEach(w => {
+    const g = new THREE.BoxGeometry(w.length, h, thick);
+    const mesh = new THREE.Mesh(g, wallMat.clone());
     mesh.position.set(w.x, h/2, w.z);
     mesh.rotation.y = w.rotation || 0;
     mesh.castShadow = true; mesh.receiveShadow = true;
-    wallsGroup.add(mesh);
+    state.wallsGroup.add(mesh);
   });
 
-  // If no walls from IA, generate from rooms
-  if ((data.walls||[]).length === 0 && (data.rooms||[]).length > 0) {
+  if ((data.walls || []).length === 0 && (data.rooms || []).length > 0) {
     generateWallsFromRooms(data.rooms, tw, td, h, thick);
   }
 
   // Doors
-  (data.doors||[]).forEach(d => {
-    const dw = d.width||.9, dh = d.height||2.1, rot = d.rotation||0;
-    const p = new THREE.BoxGeometry(thick*1.1, dh-.1, dw);
-    const pm = new THREE.MeshStandardMaterial({ color:d.color||'#8B7355', roughness:.35 });
-    const panel = new THREE.Mesh(p, pm);
-    panel.position.set(d.x, d.y||1.05, d.z); panel.rotation.y = rot; panel.castShadow = true;
-    doorsGroup.add(panel);
+  (data.doors || []).forEach(d => {
+    const dw = d.width || 0.9, dh = d.height || 2.1;
+    const g = new THREE.BoxGeometry(thick * 1.1, dh - 0.1, dw);
+    const m = new THREE.MeshStandardMaterial({ color: d.color || '#8B7355', roughness: 0.4 });
+    const mesh = new THREE.Mesh(g, m);
+    mesh.position.set(d.x, d.y || 1.05, d.z);
+    mesh.rotation.y = d.rotation || 0;
+    mesh.castShadow = true;
+    state.doorsGroup.add(mesh);
   });
 
   // Windows
-  (data.windows||[]).forEach(w => {
-    const ww = w.width||1.2, wh = w.height||1.2, rot = w.rotation||0;
-    const gg = new THREE.BoxGeometry(thick*.8, wh-.1, ww-.1);
-    const gm = new THREE.MeshStandardMaterial({ color:'#c8e8ff', roughness:.05, emissive:'#112244', emissiveIntensity:.2, opacity:.7, transparent:true });
-    const gl = new THREE.Mesh(gg, gm);
-    gl.position.set(w.x, w.y||1.2, w.z); gl.rotation.y = rot; gl.castShadow = true;
-    wallsGroup.add(gl);
+  (data.windows || []).forEach(w => {
+    const ww = w.width || 1.2, wh = w.height || 1.2;
+    const g = new THREE.BoxGeometry(thick * 0.8, wh - 0.1, ww - 0.1);
+    const m = new THREE.MeshStandardMaterial({
+      color: '#c8e8ff', roughness: 0.05, emissive: '#112244',
+      emissiveIntensity: 0.25, opacity: 0.6, transparent: true,
+    });
+    const mesh = new THREE.Mesh(g, m);
+    mesh.position.set(w.x, w.y || 1.2, w.z);
+    mesh.rotation.y = w.rotation || 0;
+    state.windowsGroup.add(mesh);
   });
 
   // Auto furniture
-  autoPlaceFurniture(data.rooms||[]);
+  autoPlaceFurniture(data.rooms || []);
 
   // Camera
-  camera.position.set(tw/2, Math.max(tw,td)*.7, td*1.3);
-  controls.target.set(tw/2, 0, td/2);
-  controls.update();
+  state.camera.position.set(tw/2, Math.max(tw,td)*0.7, td*1.3);
+  state.controls.target.set(tw/2, 0, td/2);
+  state.controls.update();
 
   updateStats(data);
   updateRoomList(data);
 }
 
 function generateWallsFromRooms(rooms, tw, td, h, thick) {
-  // Perimeter walls
-  const perimeter = [
-    [tw/2, thick/2, tw, 0], [tw/2, td-thick/2, tw, 0],
-    [thick/2, td/2, td, Math.PI/2], [tw-thick/2, td/2, td, Math.PI/2]
+  const wallMat = new THREE.MeshStandardMaterial({ map: state.textures.wall, color: '#f5f0e8', roughness: 0.7 });
+  const perim = [
+    [tw/2, thick/2, tw, 0],
+    [tw/2, td - thick/2, tw, 0],
+    [thick/2, td/2, td, Math.PI/2],
+    [tw - thick/2, td/2, td, Math.PI/2],
   ];
-  perimeter.forEach(([mx,mz,len,rot]) => {
-    const g = new THREE.BoxGeometry(1, h, thick);
-    const m = new THREE.MeshStandardMaterial({ color:'#f5f0e8', roughness:.55 });
-    const mesh = new THREE.Mesh(g, m);
-    mesh.scale.set(len,1,1); mesh.position.set(mx,h/2,mz); mesh.rotation.y=rot;
-    mesh.castShadow=true;mesh.receiveShadow=true;
-    wallsGroup.add(mesh);
+  perim.forEach(([mx, mz, len, rot]) => {
+    const g = new THREE.BoxGeometry(len, h, thick);
+    const mesh = new THREE.Mesh(g, wallMat.clone());
+    mesh.position.set(mx, h/2, mz);
+    mesh.rotation.y = rot;
+    mesh.castShadow = true; mesh.receiveShadow = true;
+    state.wallsGroup.add(mesh);
   });
-  // Interior walls between rooms
-  rooms.forEach((r1,i) => {
-    rooms.forEach((r2,j) => {
-      if (i>=j) return;
-      const r1x2=r1.x+r1.width, r1z2=r1.z+r1.depth;
-      const r2x2=r2.x+r2.width, r2z2=r2.z+r2.depth;
-      if (Math.abs(r1x2-r2.x)<.3 && r1.z<r2z2 && r1z2>r2.z && r1.z<r2.depth+r2.z) {
-        const g = new THREE.BoxGeometry(1, h, thick);
-        const m = new THREE.MeshStandardMaterial({ color:'#f5f0e8', roughness:.55 });
-        const mesh = new THREE.Mesh(g, m);
-        const z1=Math.max(r1.z,r2.z), z2=Math.min(r1z2,r2z2);
-        mesh.scale.set(z2-z1,1,1); mesh.position.set(r1x2,h/2,(z1+z2)/2);
-        mesh.rotation.y=Math.PI/2; mesh.castShadow=true;mesh.receiveShadow=true;
-        wallsGroup.add(mesh);
-      } else if (Math.abs(r1z2-r2.z)<.3 && r1.x<r2x2 && r1x2>r2.x) {
-        const g = new THREE.BoxGeometry(1, h, thick);
-        const m = new THREE.MeshStandardMaterial({ color:'#f5f0e8', roughness:.55 });
-        const mesh = new THREE.Mesh(g, m);
-        const x1=Math.max(r1.x,r2.x), x2=Math.min(r1x2,r2x2);
-        mesh.scale.set(x2-x1,1,1); mesh.position.set((x1+x2)/2,h/2,r1z2);
-        mesh.castShadow=true;mesh.receiveShadow=true;
-        wallsGroup.add(mesh);
+  // Intérieurs : segments partagés entre pièces
+  rooms.forEach((r1, i) => {
+    rooms.forEach((r2, j) => {
+      if (i >= j) return;
+      const r1x2 = r1.x + r1.width, r1z2 = r1.z + r1.depth;
+      const r2x2 = r2.x + r2.width, r2z2 = r2.z + r2.depth;
+      // vertical adjacency
+      if (Math.abs(r1x2 - r2.x) < 0.3 || Math.abs(r2x2 - r1.x) < 0.3) {
+        const z1 = Math.max(r1.z, r2.z), z2 = Math.min(r1z2, r2z2);
+        if (z2 - z1 > 0.5) {
+          const sharedX = Math.abs(r1x2 - r2.x) < 0.3 ? r1x2 : r2x2;
+          const g = new THREE.BoxGeometry(z2 - z1, h, thick);
+          const mesh = new THREE.Mesh(g, wallMat.clone());
+          mesh.position.set(sharedX, h/2, (z1 + z2)/2);
+          mesh.rotation.y = Math.PI/2;
+          mesh.castShadow = true; mesh.receiveShadow = true;
+          state.wallsGroup.add(mesh);
+        }
+      }
+      if (Math.abs(r1z2 - r2.z) < 0.3 || Math.abs(r2z2 - r1.z) < 0.3) {
+        const x1 = Math.max(r1.x, r2.x), x2 = Math.min(r1x2, r2x2);
+        if (x2 - x1 > 0.5) {
+          const sharedZ = Math.abs(r1z2 - r2.z) < 0.3 ? r1z2 : r2z2;
+          const g = new THREE.BoxGeometry(x2 - x1, h, thick);
+          const mesh = new THREE.Mesh(g, wallMat.clone());
+          mesh.position.set((x1 + x2)/2, h/2, sharedZ);
+          mesh.castShadow = true; mesh.receiveShadow = true;
+          state.wallsGroup.add(mesh);
+        }
       }
     });
   });
@@ -457,224 +879,510 @@ function generateWallsFromRooms(rooms, tw, td, h, thick) {
 // ─── FURNITURE ───
 function autoPlaceFurniture(rooms) {
   rooms.forEach(room => {
-    const cx = room.x + room.width/2;
-    const cz = room.z + room.depth/2;
+    const cx = room.x + room.width / 2;
+    const cz = room.z + room.depth / 2;
     const area = room.width * room.depth;
-    const name = (room.name||'').toLowerCase();
-    
+    const type = (room.type || '').toLowerCase();
+    const name = (room.name || '').toLowerCase();
+
     try {
-      if (name.includes('salon') || name.includes('living') || area > 18) {
-        placeFurniture('sofa', cx-1.5, 0, cz);
-        placeFurniture('table', cx+.8, 0, cz-.5);
-      } else if (name.includes('cuisine') || name.includes('kitchen')) {
-        placeFurniture('kitchen', room.x+1, 0, room.z+.5);
-        placeFurniture('table', room.x+2, 0, room.z+2.5);
-      } else if (name.includes('chambre') || name.includes('bed')) {
-        placeFurniture('bed', cx, 0, cz-.5, 1);
-        placeFurniture('desk', room.x+room.width-1.5, 0, room.z+1);
-      } else if (name.includes('sdb') || name.includes('bain') || name.includes('wc')) {
-        placeFurniture('bathtub', cx-.5, 0, cz+.5);
-      } else if (name.includes('bureau') || name.includes('office')) {
-        placeFurniture('desk', cx-.5, 0, cz);
-        placeFurniture('chair', cx-1.5, 0, cz);
-      } else {
+      if (type === 'living' || name.includes('salon') || name.includes('living')) {
+        placeFurniture('sofa', room.x + 1.5, 0, room.z + room.depth - 1);
+        placeFurniture('table', cx, 0, cz);
+        placeFurniture('tv', room.x + room.width - 0.3, 0, cz, Math.PI/2);
+        placeFurniture('plant', room.x + 0.5, 0, room.z + 0.5);
+      } else if (type === 'kitchen' || name.includes('cuisine')) {
+        placeFurniture('kitchen', room.x + 0.5, 0, room.z + 0.5);
+        if (area > 10) placeFurniture('table', cx, 0, cz + 1);
+      } else if (type === 'bedroom' || name.includes('chambre')) {
+        placeFurniture('bed', cx, 0, room.z + 1.2, 0);
+        placeFurniture('wardrobe', room.x + room.width - 0.3, 0, cz, Math.PI/2);
+        if (area > 9) placeFurniture('desk', room.x + 0.8, 0, room.z + room.depth - 0.5);
+      } else if (type === 'bathroom' || name.includes('sdb') || name.includes('bain')) {
+        placeFurniture('bathtub', room.x + 0.8, 0, cz);
+      } else if (type === 'office' || name.includes('bureau')) {
+        placeFurniture('desk', cx - 0.6, 0, cz);
+        placeFurniture('chair', cx - 0.6, 0, cz + 0.6);
+      } else if (area > 6) {
         placeFurniture('plant', cx, 0, cz);
       }
-    } catch(e) { console.log('Furniture error:', e); }
+    } catch (e) { console.warn('Furniture placement:', e); }
   });
   updateFurnitureCount();
 }
 
-function placeFurniture(type, x, y, z, rotation=0) {
+function placeFurniture(type, x, y, z, rotation = 0) {
   const item = createFurnitureMesh(type);
   item.position.set(x, y, z);
   item.rotation.y = rotation;
-  furnitureGroup.add(item);
-  furnitureItems.push({ type, mesh: item, x, y, z, rotation });
+  state.furnitureGroup.add(item);
+  state.furnitureItems.push({ type, mesh: item });
   return item;
 }
 
 function createFurnitureMesh(type) {
   const group = new THREE.Group();
-  const wood = new THREE.MeshStandardMaterial({ color:'#8B6914', roughness:.6 });
-  const dark = new THREE.MeshStandardMaterial({ color:'#3a3020', roughness:.5 });
-  const white = new THREE.MeshStandardMaterial({ color:'#f0f0f0', roughness:.4, metalness:.1 });
-  const blue = new THREE.MeshStandardMaterial({ color:'#4a6fa5', roughness:.3 });
-  const green = new THREE.MeshStandardMaterial({ color:'#4a7c3f', roughness:.7 });
-  
-  switch(type) {
+  const wood = new THREE.MeshStandardMaterial({ color: '#8B6914', roughness: 0.65 });
+  const woodDark = new THREE.MeshStandardMaterial({ color: '#5a3d10', roughness: 0.55 });
+  const dark = new THREE.MeshStandardMaterial({ color: '#3a3020', roughness: 0.5 });
+  const white = new THREE.MeshStandardMaterial({ color: '#f0f0f0', roughness: 0.4 });
+  const fabric = new THREE.MeshStandardMaterial({ color: '#4a6fa5', roughness: 0.85 });
+  const green = new THREE.MeshStandardMaterial({ color: '#4a7c3f', roughness: 0.75 });
+  const metal = new THREE.MeshStandardMaterial({ color: '#cccccc', roughness: 0.3, metalness: 0.7 });
+  const screen = new THREE.MeshStandardMaterial({ color: '#101015', roughness: 0.2, emissive: '#202030', emissiveIntensity: 0.5 });
+
+  const mk = (w,h,d,m,x,y,z) => {
+    const me = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), m);
+    me.position.set(x,y,z); me.castShadow = true; me.receiveShadow = true;
+    return me;
+  };
+
+  switch (type) {
     case 'table':
-      group.add(makeBox(.02,.05,.02,wood,0,-.38,0)); // leg1
-      group.add(makeBox(.02,.05,.02,wood,.8,-.38,0));
-      group.add(makeBox(.02,.05,.02,wood,0,-.38,.8));
-      group.add(makeBox(.02,.05,.02,wood,.8,-.38,.8));
-      group.add(makeBox(.9,.04,.9,wood,.4,.42,.4)); // top
-      group.scale.set(1.5,1,1.5);
+      group.add(mk(1.2, 0.04, 0.8, wood, 0, 0.74, 0));
+      [-0.55, 0.55].forEach(x => [-0.35, 0.35].forEach(z => {
+        group.add(mk(0.05, 0.72, 0.05, woodDark, x, 0.36, z));
+      }));
       break;
     case 'chair':
-      group.add(makeBox(.35,.04,.35,dark,0,-.2,0)); // seat
-      group.add(makeBox(.03,.35,.03,dark,0,.15,.3)); // back
-      group.scale.set(.8,1,.8);
+      group.add(mk(0.45, 0.04, 0.45, woodDark, 0, 0.45, 0));
+      group.add(mk(0.45, 0.5, 0.04, woodDark, 0, 0.7, -0.21));
+      [-0.2, 0.2].forEach(x => [-0.2, 0.2].forEach(z => {
+        group.add(mk(0.04, 0.43, 0.04, woodDark, x, 0.22, z));
+      }));
       break;
     case 'bed':
-      group.add(makeBox(1.6,.15,2.1,white,0,.05,0)); // mattress
-      group.add(makeBox(1.7,.4,.2,wood,0,-.15,-1)); // headboard
-      group.add(makeBox(1.7,.05,2.2,dark,0,-.25,0)); // base
+      group.add(mk(1.6, 0.1, 2.0, white, 0, 0.55, 0));
+      group.add(mk(1.6, 0.35, 0.1, woodDark, 0, 0.75, -1.0));
+      group.add(mk(1.7, 0.2, 2.1, wood, 0, 0.4, 0));
+      // pillows
+      group.add(mk(0.7, 0.08, 0.4, white, -0.4, 0.65, -0.7));
+      group.add(mk(0.7, 0.08, 0.4, white, 0.4, 0.65, -0.7));
       break;
     case 'sofa':
-      group.add(makeBox(2.2,.3,.8,dark,0,-.1,0)); // seat
-      group.add(makeBox(2.2,.45,.15,dark,0,.25,-.35)); // back
-      group.add(makeBox(.15,.3,.8,dark,1.05,-.1,0)); // arm
-      group.add(makeBox(.15,.3,.8,dark,-1.05,-.1,0));
+      group.add(mk(2.2, 0.35, 0.85, fabric, 0, 0.3, 0));
+      group.add(mk(2.2, 0.5, 0.15, fabric, 0, 0.65, -0.4));
+      group.add(mk(0.15, 0.45, 0.85, fabric, -1.1, 0.4, 0));
+      group.add(mk(0.15, 0.45, 0.85, fabric, 1.1, 0.4, 0));
+      // cushions
+      group.add(mk(0.6, 0.15, 0.5, white, -0.6, 0.55, 0));
+      group.add(mk(0.6, 0.15, 0.5, white, 0.6, 0.55, 0));
       break;
     case 'kitchen':
-      group.add(makeBox(.8,1.1,.7,new THREE.MeshStandardMaterial({ color:'#ddd', roughness:.3, metalness:.7 }),0,.4,0));
-      group.add(makeBox(.15,.08,.15,dark,-.3,.95,-.2)); // burner
-      group.add(makeBox(.15,.08,.15,dark,.3,.95,.2));
+      group.add(mk(2.0, 0.9, 0.65, white, 0, 0.45, 0));
+      group.add(mk(2.05, 0.05, 0.7, dark, 0, 0.92, 0));
+      // burners
+      [-0.3, 0.3].forEach(x => [-0.15, 0.15].forEach(z => {
+        const b = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.02, 16), dark);
+        b.position.set(x, 0.95, z); group.add(b);
+      }));
+      // hood above
+      group.add(mk(0.8, 0.2, 0.4, metal, 0, 1.8, -0.15));
       break;
     case 'bathtub':
-      group.add(makeBox(1.6,.6,.7,white,0,.15,0));
+      group.add(mk(1.6, 0.55, 0.75, white, 0, 0.3, 0));
+      // inner cavity (illusion)
+      group.add(mk(1.4, 0.4, 0.55, new THREE.MeshStandardMaterial({color:'#e0eef8',roughness:.2}), 0, 0.4, 0));
       break;
     case 'desk':
-      group.add(makeBox(1.2,.04,.6,wood,0,.42,0)); // top
-      group.add(makeBox(.03,.45,.6,wood,-.55,-.2,0)); // legs
-      group.add(makeBox(.03,.45,.6,wood,.55,-.2,0));
+      group.add(mk(1.4, 0.04, 0.7, wood, 0, 0.74, 0));
+      group.add(mk(0.04, 0.72, 0.65, woodDark, -0.65, 0.36, 0));
+      group.add(mk(0.04, 0.72, 0.65, woodDark, 0.65, 0.36, 0));
+      // drawer
+      group.add(mk(0.5, 0.5, 0.5, wood, 0.4, 0.3, 0));
       break;
     case 'plant':
-      group.add(makeBox(.25,.4,.25,new THREE.MeshStandardMaterial({ color:'#8B4513', roughness:.7 }),0,-.05,0)); // pot
-      group.add(makeBox(.35,.5,.35,green,0,.3,0)); // leaves
+      group.add(mk(0.35, 0.3, 0.35, new THREE.MeshStandardMaterial({color:'#8B4513',roughness:.8}), 0, 0.15, 0));
+      const leaves = new THREE.Mesh(new THREE.SphereGeometry(0.4, 12, 10), green);
+      leaves.position.y = 0.6; leaves.castShadow = true; group.add(leaves);
+      // trunk
+      group.add(mk(0.05, 0.3, 0.05, woodDark, 0, 0.42, 0));
+      break;
+    case 'tv':
+      group.add(mk(0.1, 0.7, 1.3, screen, 0, 1.1, 0));
+      group.add(mk(0.05, 0.5, 0.05, dark, 0, 0.5, 0));
+      group.add(mk(0.6, 0.05, 0.4, dark, 0, 0.25, 0));
+      break;
+    case 'wardrobe':
+      group.add(mk(0.6, 2.2, 1.5, woodDark, 0, 1.1, 0));
+      // handles
+      group.add(mk(0.05, 0.05, 0.05, metal, 0.32, 1.1, -0.3));
+      group.add(mk(0.05, 0.05, 0.05, metal, 0.32, 1.1, 0.3));
       break;
   }
-  
-  group.castShadow = true; group.receiveShadow = true;
   group.userData = { isFurniture: true, type };
   return group;
 }
 
-function makeBox(w,h,d,mat,x,y,z) {
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
-  mesh.position.set(x,y,z);
-  mesh.castShadow = true; mesh.receiveShadow = true;
-  return mesh;
-}
-
-function addFurniture(type) {
-  if (!modelData) { toast('Chargez un plan d\'abord'); return; }
-  const tw = (modelData.metadata||{}).total_width || 10;
-  const td = (modelData.metadata||{}).total_depth || 8;
-  placeFurniture(type, tw/2, 0, td/2);
+window.addFurniture = function(type) {
+  if (!state.modelData) { toast('Chargez un plan d\'abord', 'error'); return; }
+  const meta = state.modelData.metadata || {};
+  placeFurniture(type, meta.total_width/2, 0, meta.total_depth/2);
   updateFurnitureCount();
-  toast('🪑 '+type+' ajouté ! Déplacez-le avec la souris en mode Orbite');
-}
+  toast(`🪑 ${type} ajouté — glissez avec la souris en mode Orbite`, 'success');
+};
 
-function clearFurniture() {
-  furnitureItems.forEach(item => furnitureGroup.remove(item.mesh));
-  furnitureItems = [];
+window.clearFurniture = function() {
+  state.furnitureItems.forEach(it => state.furnitureGroup.remove(it.mesh));
+  state.furnitureItems = [];
   updateFurnitureCount();
   toast('🗑️ Meubles supprimés');
-}
+};
 
 function updateFurnitureCount() {
-  document.getElementById('btn-furniture').textContent = '🪑 Meubles ('+furnitureItems.length+')';
+  const n = state.furnitureItems.length;
+  document.getElementById('btn-furniture').textContent = `🪑 Meubles (${n})`;
+  const el = document.getElementById('cnt-furniture');
+  if (el) el.textContent = n;
 }
 
-// ─── UI ───
+// ─── UI UPDATES ───
 function updateStats(data) {
-  document.getElementById('stat-walls').textContent = (data.walls||[]).length || wallsGroup.children.length;
-  document.getElementById('stat-doors').textContent = (data.doors||[]).length;
-  document.getElementById('stat-windows').textContent = (data.windows||[]).length;
-  const area = (data.rooms||[]).reduce((s,r)=>s+(r.width||0)*(r.depth||0),0);
-  document.getElementById('stat-area').textContent = area.toFixed(1);
-  document.getElementById('total-area').textContent = area.toFixed(1);
+  const rooms = data.rooms || [];
+  const surface = rooms.reduce((s, r) => s + (r.width || 0) * (r.depth || 0), 0);
+  const meta = data.metadata || {};
+  const plancher = (meta.total_width || 0) * (meta.total_depth || 0);
+
+  setText('stat-rooms', rooms.length);
+  setText('stat-walls', (data.walls || []).length || state.wallsGroup.children.length);
+  setText('stat-doors', (data.doors || []).length);
+  setText('stat-windows', (data.windows || []).length);
+  setText('stat-area', surface.toFixed(1));
+  setText('surface-habitable', surface.toFixed(1));
+  setText('surface-plancher', plancher.toFixed(1));
+  setText('cnt-walls', (data.walls || []).length || state.wallsGroup.children.length);
+  setText('cnt-doors', (data.doors || []).length);
+  setText('cnt-windows', (data.windows || []).length);
   document.getElementById('stats').style.opacity = '1';
 }
+function setText(id, v) { const el = document.getElementById(id); if (el) el.textContent = v; }
 
 function updateRoomList(data) {
   const list = document.getElementById('room-list');
   list.innerHTML = '';
-  const colors = ['#f4a460','#7ec850','#68a0d8','#c080d0','#50c8b8','#e8a040','#60b880','#5890d0','#b870c8','#48b8a8'];
-  (data.rooms||[]).forEach((room,i) => {
+  (data.rooms || []).forEach((room, i) => {
+    const color = room.color || COLORS[i % COLORS.length];
     const d = document.createElement('div');
     d.className = 'room-item';
-    const color = room.color || colors[i%colors.length];
-    d.innerHTML = `<div class="room-color" style="background:${color}"></div><div>${room.name||'Pièce '+(i+1)}<br><span style="font-size:10px;color:var(--t2)">${(room.width||0).toFixed(1)}×${(room.depth||0).toFixed(1)}m</span></div>`;
+    d.innerHTML = `<div class="room-color" style="background:${color}"></div>
+      <div class="room-name">${escapeHtml(room.name || 'Pièce ' + (i+1))}
+        <div class="room-dim">${(room.width||0).toFixed(1)}×${(room.depth||0).toFixed(1)} m · ${((room.width||0)*(room.depth||0)).toFixed(1)} m²</div>
+      </div>`;
     d.onclick = e => { e.stopPropagation(); focusRoom(room); };
     list.appendChild(d);
   });
 }
 
+function escapeHtml(s) { return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
 function focusRoom(room) {
-  if (!room || isWalkMode) return;
-  const cx = room.x+room.width/2, cz = room.z+room.depth/2;
-  const dist = Math.max(room.width,room.depth)*1.5+1;
-  const s={x:camera.position.x,y:camera.position.y,z:camera.position.z,tx:controls.target.x,ty:controls.target.y,tz:controls.target.z};
-  const e={x:cx+dist*.6,y:dist*.7,z:cz+dist*.6,tx:cx,ty:0,tz:cz};
-  const dur=600,st=performance.now();
-  function step(now){const t=Math.min((now-st)/dur,1),ee=1-Math.pow(1-t,3);camera.position.set(s.x+(e.x-s.x)*ee,s.y+(e.y-s.y)*ee,s.z+(e.z-s.z)*ee);controls.target.set(s.tx+(e.tx-s.tx)*ee,s.ty+(e.ty-s.ty)*ee,s.tz+(e.tz-s.tz)*ee);if(t<1)requestAnimationFrame(step);}
-  requestAnimationFrame(step);
+  if (!room || state.isWalkMode) return;
+  const cx = room.x + room.width/2, cz = room.z + room.depth/2;
+  const dist = Math.max(room.width, room.depth) * 1.4 + 1;
+  const startP = state.camera.position.clone();
+  const startT = state.controls.target.clone();
+  const endP = new THREE.Vector3(cx + dist*0.6, dist*0.7, cz + dist*0.6);
+  const endT = new THREE.Vector3(cx, 0, cz);
+  const dur = 600, t0 = performance.now();
+  (function step(now) {
+    const t = Math.min((now - t0) / dur, 1);
+    const e = 1 - Math.pow(1 - t, 3);
+    state.camera.position.lerpVectors(startP, endP, e);
+    state.controls.target.lerpVectors(startT, endT, e);
+    if (t < 1) requestAnimationFrame(step);
+  })(t0);
 }
 
-function toggleSidebar() {
-  sidebarOpen = !sidebarOpen;
-  document.getElementById('sidebar').classList.toggle('collapsed', !sidebarOpen);
-  document.getElementById('sidebar-toggle').textContent = sidebarOpen ? '−' : '+';
-}
-
-function toggleFurniturePanel() {
+window.toggleSidebar = () => document.getElementById('sidebar').classList.toggle('hidden');
+window.toggleFurniturePanel = () => {
   document.getElementById('furniture-panel').classList.toggle('hidden');
   document.getElementById('btn-furniture').classList.toggle('active');
-}
+};
+window.toggleWalls = () => {
+  state.showWalls = !state.showWalls;
+  state.wallsGroup.visible = state.showWalls;
+  document.getElementById('btn-walls').classList.toggle('active', state.showWalls);
+  document.getElementById('tool-walls').classList.toggle('active', state.showWalls);
+};
+window.toggleFullscreen = () => {
+  if (document.fullscreenElement) document.exitFullscreen();
+  else document.body.requestFullscreen();
+};
+window.resetCamera = () => {
+  if (state.modelData) {
+    const meta = state.modelData.metadata || {};
+    const tw = meta.total_width || 10, td = meta.total_depth || 8;
+    state.camera.position.set(tw/2, Math.max(tw,td)*0.7, td*1.3);
+    state.controls.target.set(tw/2, 0, td/2);
+  } else {
+    state.camera.position.set(8, 12, 14);
+    state.controls.target.set(5, 0, 4);
+  }
+  state.controls.update();
+};
+window.setMode = setMode;
+
+window.resetScene = () => {
+  [state.wallsGroup, state.roomsGroup, state.doorsGroup, state.windowsGroup, state.furnitureGroup].forEach(g => {
+    while (g.children.length) g.remove(g.children[0]);
+  });
+  if (state.floorMesh) { state.modelGroup.remove(state.floorMesh); state.floorMesh = null; }
+  state.modelData = null; state.hoveredRoom = null; state.furnitureItems = [];
+  document.getElementById('upload-zone').classList.remove('hidden');
+  document.getElementById('toolbar').classList.add('hidden');
+  document.getElementById('sidebar').classList.add('hidden');
+  document.getElementById('bottombar').classList.add('hidden');
+  document.getElementById('furniture-panel').classList.add('hidden');
+  document.getElementById('stats').style.opacity = '0';
+  state.camera.position.set(8, 12, 14);
+  state.controls.target.set(5, 0, 4);
+  state.controls.update();
+  toast('🔄 Prêt pour un nouveau plan');
+};
 
 // ─── ACTIONS ───
 window.loadDemo = function() {
-  if (isLoading) return;
-  isLoading = true;
-  showLoading('Chargement démo...');
+  if (state.isLoading) return;
+  state.isLoading = true;
+  showLoading('Chargement démo...', 'Modèle d\'exemple');
   document.getElementById('upload-zone').classList.add('hidden');
-  fetch('/api/demo-model').then(r=>r.json()).then(json=>{
-    buildScene(json.model);
-    showUI();
-    toast('🏠 Démo chargée | 🖱️ Orbite = vue 3D | 🚶 Visite = immersion | 🪑 Meubles = ameublement auto');
-  }).catch(e=>toast('❌ '+e.message)).finally(()=>{hideLoading();isLoading=false;});
+  fetch('/api/demo-model')
+    .then(r => r.json())
+    .then(json => {
+      buildScene(json.model);
+      showUI();
+      toast('🏠 Démo chargée', 'success');
+    })
+    .catch(e => {
+      toast('❌ ' + e.message, 'error');
+      document.getElementById('upload-zone').classList.remove('hidden');
+    })
+    .finally(() => { hideLoading(); state.isLoading = false; });
 };
 
 window.uploadFile = function(file) {
-  if (!file || isLoading) return;
-  isLoading = true;
-  if (!file.type.startsWith('image/')) { toast('❌ PNG ou JPG uniquement'); isLoading=false; return; }
-  
-  showLoading('🔍 Gemini analyse votre plan...');
+  if (!file || state.isLoading) return;
+  if (!file.type.startsWith('image/')) {
+    toast('❌ PNG, JPG ou WEBP uniquement', 'error');
+    return;
+  }
+  if (file.size > 8 * 1024 * 1024) {
+    toast('❌ Fichier trop volumineux (max 8 Mo)', 'error');
+    return;
+  }
+  state.isLoading = true;
+  showLoading('🔍 Analyse du plan par IA...', 'Détection des pièces, murs, ouvertures');
   document.getElementById('upload-zone').classList.add('hidden');
-  
+
   const fd = new FormData(); fd.append('file', file);
-  fetch('/api/analyze-plan', {method:'POST',body:fd})
-    .then(r=>{if(!r.ok)throw new Error('Erreur '+r.status);return r.json();})
-    .then(json=>{
-      if (json.analysis?.error) throw new Error(json.analysis.error);
-      if (!json.analysis?.rooms?.length) throw new Error('Aucune pièce détectée');
-      showLoading('🏗️ Génération 3D...');
-      return fetch('/api/build-3d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({analysis:json.analysis,file_id:json.file_id})}).then(r=>r.json());
+  fetch('/api/analyze-plan', { method: 'POST', body: fd })
+    .then(async r => {
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        throw new Error(err.detail || `Erreur ${r.status}`);
+      }
+      return r.json();
     })
-    .then(bj=>{buildScene(bj.model);showUI();toast('✅ Plan analysé → 3D + meubles générés !');})
-    .catch(e=>{toast('⚠️ '+e.message);document.getElementById('upload-zone').classList.remove('hidden');})
-    .finally(()=>{hideLoading();isLoading=false;});
+    .then(json => {
+      if (json.analysis?.error) throw new Error(json.analysis.error);
+      if (!json.analysis?.rooms?.length) throw new Error('Aucune pièce détectée dans ce plan');
+      state.fileId = json.file_id;
+      showLoading('🏗️ Construction du modèle 3D...', `${json.analysis.rooms.length} pièces détectées`);
+      return fetch('/api/build-3d', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ analysis: json.analysis, file_id: json.file_id }),
+      }).then(r => r.json());
+    })
+    .then(bj => {
+      buildScene(bj.model);
+      showUI();
+      const src = bj.model.metadata?.source || 'IA';
+      toast(`✅ Plan analysé → 3D générée (source: ${src})`, 'success');
+    })
+    .catch(e => {
+      toast('⚠️ ' + e.message, 'error');
+      document.getElementById('upload-zone').classList.remove('hidden');
+    })
+    .finally(() => {
+      hideLoading();
+      state.isLoading = false;
+    });
 };
 
-window.setMode = setMode;
-window.toggleWalls = function(){showWalls=!showWalls;wallsGroup.visible=showWalls;document.getElementById('btn-walls').classList.toggle('active',showWalls);};
-window.toggleFullscreen = function(){document.fullscreenElement?document.exitFullscreen():document.body.requestFullscreen();};
-window.resetCamera = function(){if(modelData){const tw=(modelData.metadata||{}).total_width||10,td=(modelData.metadata||{}).total_depth||8;camera.position.set(tw/2,Math.max(tw,td)*.7,td*1.3);controls.target.set(tw/2,0,td/2);}else{camera.position.set(8,12,14);controls.target.set(5,0,4);}controls.update();};
-window.resetScene = function(){[wallsGroup,roomsGroup,doorsGroup,furnitureGroup].forEach(g=>{while(g.children.length)g.remove(g.children[0]);});if(floorMesh){modelGroup.remove(floorMesh);floorMesh=null;}modelData=null;hoveredRoom=null;furnitureItems=[];document.getElementById('upload-zone').classList.remove('hidden');document.getElementById('sidebar').classList.add('hidden');document.getElementById('bottombar').classList.add('hidden');document.getElementById('furniture-panel').classList.add('hidden');document.getElementById('stats').style.opacity='0';camera.position.set(8,12,14);controls.target.set(5,0,4);controls.update();toast('🔄 Prêt');};
-window.addFurniture = addFurniture;
-window.clearFurniture = clearFurniture;
-window.toggleSidebar = toggleSidebar;
-window.toggleFurniturePanel = toggleFurniturePanel;
+// ─── EXPORTS ───
+window.exportOBJ = function() {
+  if (!state.modelData) return toast('Aucun modèle à exporter', 'error');
+  try {
+    const exporter = new OBJExporter();
+    const text = exporter.parse(state.modelGroup);
+    downloadText(text, `archiplan_${state.fileId || 'model'}.obj`, 'text/plain');
+    toast('📦 Export OBJ téléchargé', 'success');
+  } catch (e) { toast('❌ Export OBJ : ' + e.message, 'error'); }
+};
 
-function showUI(){document.getElementById('sidebar').classList.remove('hidden');document.getElementById('bottombar').classList.remove('hidden');updateFurnitureCount();}
-function showLoading(t){document.getElementById('loading-text').textContent=t;document.getElementById('loading').classList.remove('hidden');}
-function hideLoading(){document.getElementById('loading').classList.add('hidden');}
-function toast(m){const e=document.createElement('div');e.className='toast';e.textContent=m;document.body.appendChild(e);setTimeout(()=>{e.style.opacity='0';setTimeout(()=>e.remove(),300);},4000);}
-function onResize(){camera.aspect=window.innerWidth/window.innerHeight;camera.updateProjectionMatrix();renderer.setSize(window.innerWidth,window.innerHeight);}
+window.exportGLTF = function() {
+  if (!state.modelData) return toast('Aucun modèle à exporter', 'error');
+  try {
+    const exporter = new GLTFExporter();
+    exporter.parse(state.modelGroup, gltf => {
+      const text = JSON.stringify(gltf, null, 2);
+      downloadText(text, `archiplan_${state.fileId || 'model'}.gltf`, 'application/json');
+      toast('📐 Export glTF téléchargé', 'success');
+    }, err => toast('❌ Export glTF : ' + err, 'error'));
+  } catch (e) { toast('❌ Export glTF : ' + e.message, 'error'); }
+};
+
+window.exportScreenshot = function() {
+  try {
+    state.renderer.render(state.scene, state.camera);
+    const url = state.renderer.domElement.toDataURL('image/png');
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `archiplan_${state.fileId || 'screenshot'}_${Date.now()}.png`;
+    a.click();
+    toast('📸 Screenshot enregistré', 'success');
+  } catch (e) { toast('❌ Screenshot : ' + e.message, 'error'); }
+};
+
+window.exportReport = function() {
+  if (!state.modelData) return toast('Aucun modèle à exporter', 'error');
+  const rooms = state.modelData.rooms || [];
+  const meta = state.modelData.metadata || {};
+  const report = {
+    generated_at: new Date().toISOString(),
+    project: state.fileId || 'archiplan',
+    source: meta.source || 'inconnu',
+    dimensions: {
+      total_width_m: meta.total_width,
+      total_depth_m: meta.total_depth,
+      wall_height_m: meta.wall_height,
+    },
+    surfaces: {
+      habitable_m2: +rooms.reduce((s,r) => s + r.width * r.depth, 0).toFixed(2),
+      plancher_m2: +((meta.total_width || 0) * (meta.total_depth || 0)).toFixed(2),
+    },
+    rooms: rooms.map(r => ({
+      name: r.name, type: r.type,
+      width_m: r.width, depth_m: r.depth,
+      surface_m2: +(r.width * r.depth).toFixed(2),
+    })),
+    counts: {
+      rooms: rooms.length,
+      walls: (state.modelData.walls || []).length,
+      doors: (state.modelData.doors || []).length,
+      windows: (state.modelData.windows || []).length,
+      furniture: state.furnitureItems.length,
+    },
+  };
+  downloadText(JSON.stringify(report, null, 2), `archiplan_rapport_${state.fileId || 'projet'}.json`, 'application/json');
+  toast('📊 Rapport JSON téléchargé', 'success');
+};
+
+function downloadText(text, name, mime) {
+  const blob = new Blob([text], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// ─── COST MODAL ───
+window.openCostModal = function() {
+  if (!state.modelData) return toast('Aucun modèle', 'error');
+  document.getElementById('cost-modal').classList.add('show');
+  calculateCost();
+};
+window.calculateCost = function() {
+  const price = +document.getElementById('price-m2').value || 1800;
+  fetch('/api/estimate-cost', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: state.modelData, price_per_m2: price }),
+  })
+    .then(r => r.json())
+    .then(d => {
+      document.getElementById('cost-result').innerHTML = `
+        <div style="margin-bottom:8px"><b>Surface habitable</b><br>${d.surface_habitable_m2} m²</div>
+        <div style="margin-bottom:8px"><b>Surface plancher</b><br>${d.surface_plancher_m2} m²</div>
+        <div style="margin-bottom:8px"><b>Prix au m²</b><br>${d.price_per_m2.toLocaleString('fr')} €</div>
+        <div style="border-top:1px solid var(--b);padding-top:8px;margin-top:8px"><b>Coût estimé</b><br>
+        <span style="font-size:18px;color:var(--a2);font-weight:700">${d.total_cost_eur.toLocaleString('fr')} €</span></div>
+        <div style="font-size:10px;color:var(--t2);margin-top:6px">Estimation indicative — hors VRD, terrain, finitions haut-de-gamme.</div>
+      `;
+    })
+    .catch(e => toast('❌ ' + e.message, 'error'));
+};
+
+// ─── EDIT MODAL ───
+window.openEditModal = function() {
+  if (!state.modelData?.rooms?.length) return toast('Aucune pièce', 'error');
+  const sel = document.getElementById('edit-room-select');
+  sel.innerHTML = '';
+  state.modelData.rooms.forEach((r, i) => {
+    const o = document.createElement('option');
+    o.value = i; o.textContent = r.name || `Pièce ${i+1}`;
+    sel.appendChild(o);
+  });
+  sel.onchange = loadRoomEdit;
+  document.getElementById('edit-modal').classList.add('show');
+  loadRoomEdit();
+};
+function loadRoomEdit() {
+  const i = +document.getElementById('edit-room-select').value;
+  const r = state.modelData.rooms[i];
+  document.getElementById('edit-name').value = r.name || '';
+  document.getElementById('edit-width').value = r.width;
+  document.getElementById('edit-depth').value = r.depth;
+}
+window.applyRoomEdit = function() {
+  const i = +document.getElementById('edit-room-select').value;
+  const r = state.modelData.rooms[i];
+  r.name = document.getElementById('edit-name').value || r.name;
+  r.width = +document.getElementById('edit-width').value || r.width;
+  r.depth = +document.getElementById('edit-depth').value || r.depth;
+  // Rebuild scene to reflect changes
+  buildScene(state.modelData);
+  closeModal('edit-modal');
+  toast('✏️ Pièce mise à jour', 'success');
+};
+
+window.closeModal = id => document.getElementById(id).classList.remove('show');
+
+// ─── UI helpers ───
+function showUI() {
+  document.getElementById('toolbar').classList.remove('hidden');
+  document.getElementById('sidebar').classList.remove('hidden');
+  document.getElementById('bottombar').classList.remove('hidden');
+  updateFurnitureCount();
+}
+function showLoading(t, sub) {
+  document.getElementById('loading-text').textContent = t;
+  document.getElementById('loading-sub').textContent = sub || '';
+  document.getElementById('loading').classList.remove('hidden');
+}
+function hideLoading() {
+  document.getElementById('loading').classList.add('hidden');
+}
+function toast(m, kind) {
+  const e = document.createElement('div');
+  e.className = 'toast' + (kind ? ' ' + kind : '');
+  e.textContent = m;
+  document.body.appendChild(e);
+  setTimeout(() => { e.style.transition = 'opacity .3s'; e.style.opacity = '0'; setTimeout(() => e.remove(), 300); }, 3500);
+}
+function onResize() {
+  state.camera.aspect = window.innerWidth / window.innerHeight;
+  state.camera.updateProjectionMatrix();
+  state.renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+// Failsafe : si quelque chose plante au démarrage, on cache le loading après 8s
+setTimeout(() => {
+  if (document.getElementById('loading') && !document.getElementById('loading').classList.contains('hidden')) {
+    document.getElementById('loading').classList.add('hidden');
+  }
+}, 8000);
 
 initScene();
 </script>

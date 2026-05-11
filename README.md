@@ -73,28 +73,36 @@ Clique sur **✨ Démo** pour voir une maison 5 pièces avec meubles.
 ## 🔧 Installation locale
 
 ### Prérequis
-- Python 3.10+
+- Python 3.10+ **ou** Docker
 - Clé API OpenRouter (pour l'analyse IA)
-- pip
 
-### Setup
+### Option A — Docker (recommandé)
 
 ```bash
-# Cloner le projet
 git clone https://github.com/gavoekoffi2/ArchiPlan-AI.git
-cd ArchiPlan-AI/app
-
-# Installer les dépendances
-pip install fastapi uvicorn httpx python-multipart opencv-python-headless
-
-# Configurer la clé API
-export OPENROUTER_API_KEY="sk-or-v1-..."
-
-# Lancer
-python main.py
+cd ArchiPlan-AI
+cp .env.example .env       # puis renseignez OPENROUTER_API_KEY
+docker compose up -d
 ```
 
-Puis ouvre `http://localhost:9090`
+L'app est dispo sur `http://localhost:9090`.
+
+### Option B — Python natif
+
+```bash
+git clone https://github.com/gavoekoffi2/ArchiPlan-AI.git
+cd ArchiPlan-AI
+pip install -r requirements.txt
+export OPENROUTER_API_KEY="sk-or-v1-..."
+python app/main.py
+```
+
+### Tests
+
+```bash
+pip install -r requirements.txt
+pytest tests/ -v
+```
 
 ---
 
