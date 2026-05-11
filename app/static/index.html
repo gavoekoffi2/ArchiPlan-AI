@@ -56,6 +56,13 @@ body{font-family:Inter,Segoe UI,system-ui,sans-serif;background:var(--bg);color:
 .tool-sep{height:1px;background:var(--b);margin:4px 2px}
 .tool[data-tooltip]:hover::after{content:attr(data-tooltip);position:absolute;left:46px;top:50%;transform:translateY(-50%);background:var(--s2);padding:4px 8px;border-radius:6px;font-size:11px;white-space:nowrap;color:var(--t);border:1px solid var(--b);box-shadow:var(--shadow);z-index:100}
 
+/* Sélecteur de pièces (dropdown en bas, centré) */
+#room-selector{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);z-index:15;transition:opacity .3s}
+#room-selector.hidden{opacity:0;pointer-events:none}
+#room-select{padding:9px 16px;border-radius:var(--rs);background:var(--panel);color:var(--t);border:1px solid var(--b);font-size:12px;font-weight:500;cursor:pointer;backdrop-filter:blur(10px);min-width:220px;font-family:inherit;box-shadow:var(--shadow)}
+#room-select:hover{border-color:var(--a)}
+#room-select option{background:var(--s1);color:var(--t);font-size:12px}
+
 /* Right sidebar */
 #sidebar{position:absolute;right:12px;top:60px;width:280px;max-height:calc(100vh - 140px);overflow-y:auto;z-index:15}
 #sidebar.hidden{display:none}
@@ -202,13 +209,16 @@ canvas{display:block}
     <button class="tool" data-tooltip="Réinitialiser" onclick="resetScene()">🔄</button>
   </div>
 
-  <!-- Right sidebar with rooms + metrics -->
+  <!-- Sélecteur de pièces (dropdown en bas, n'occulte PAS la 3D) -->
+  <div id="room-selector" class="hidden">
+    <select id="room-select" onchange="onRoomSelect(this.value)">
+      <option value="">📋 Aller à une pièce…</option>
+    </select>
+  </div>
+
+  <!-- Sidebar (cachée par défaut, accessible via 📋 dans la toolbar) -->
   <div id="sidebar" class="panel hidden">
     <div class="drag-handle" data-drag="sidebar">Infos<button class="drag-close" onclick="toggleSidebar()" title="Fermer">×</button></div>
-    <div class="sidebar-section">
-      <div class="sidebar-title">Pièces</div>
-      <div id="room-list"></div>
-    </div>
     <div class="sidebar-section">
       <div class="sidebar-title">Surface</div>
       <div class="metric"><span>Habitable</span><span class="metric-val"><span id="surface-habitable">—</span> m²</span></div>
@@ -220,6 +230,10 @@ canvas{display:block}
       <div class="metric"><span>Portes</span><span class="metric-val" id="cnt-doors">—</span></div>
       <div class="metric"><span>Fenêtres</span><span class="metric-val" id="cnt-windows">—</span></div>
       <div class="metric"><span>Meubles</span><span class="metric-val" id="cnt-furniture">—</span></div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-title">Pièces</div>
+      <div id="room-list"></div>
     </div>
   </div>
 
@@ -683,37 +697,19 @@ window.resetPanelPositions = function() {
 // ─── RENDER LOOP ───
 function animate() {
   requestAnimationFrame(animate);
-  if (state.isWalkMode) {
-    updateWalk();
-    drawMinimap();
-  } else {
-    state.controls.update();
-    if (state.roomsGroup.children.length > 0 && !state.draggedFurniture) {
-      state.raycaster.setFromCamera(state.mouse, state.camera);
-      const hits = state.raycaster.intersectObjects(state.roomsGroup.children);
-      if (hits.length > 0) {
-        const obj = hits[0].object;
-        if (state.hoveredRoom !== obj) {
-          if (state.hoveredRoom?.material?.emissive) {
-            state.hoveredRoom.material.emissive.setHex(0);
-            state.hoveredRoom.material.emissiveIntensity = 0;
-          }
-          state.hoveredRoom = obj;
-          if (state.hoveredRoom.material.emissive) {
-            state.hoveredRoom.material.emissive.set('#3a2870');
-            state.hoveredRoom.material.emissiveIntensity = 0.4;
-          }
-        }
-      } else if (state.hoveredRoom) {
-        if (state.hoveredRoom.material.emissive) {
-          state.hoveredRoom.material.emissive.setHex(0);
-          state.hoveredRoom.material.emissiveIntensity = 0;
-        }
-        state.hoveredRoom = null;
-      }
+  try {
+    if (state.isWalkMode) {
+      updateWalk();
+      drawMinimap();
+    } else {
+      state.controls.update();
+      // Hover de pièce désactivé (les sols sont maintenant simples et le sprite label flotte)
     }
+    state.renderer.render(state.scene, state.camera);
+  } catch (e) {
+    // Un crash dans le rendu ne doit jamais tuer la boucle d'animation
+    console.error('[animate] erreur :', e);
   }
-  state.renderer.render(state.scene, state.camera);
 }
 
 // ─── WALK MODE + COLLISION ───
@@ -794,11 +790,8 @@ function setMode(m) {
       state.controls.target.copy(state._savedOrbitTarget);
       state.camera.position.copy(state._savedCameraPos);
       state.camera.quaternion.copy(state._savedCameraQuat);
-    } else if (state.modelData) {
-      const meta = state.modelData.metadata || {};
-      const tw = meta.total_width || 10, td = meta.total_depth || 8;
-      state.camera.position.set(tw/2, Math.max(tw,td)*0.85, td*1.4);
-      state.controls.target.set(tw/2, 0, td/2);
+    } else if (state._bbox) {
+      fitLightsAndCameraToBBox(state._bbox);
     }
     state.controls.enabled = true;
     state.controls.update();
@@ -1180,13 +1173,58 @@ function buildScene(data) {
   // Toit / plafond (caché par défaut)
   generateRoof(data, h, tw, td);
 
-  // Camera
-  state.camera.position.set(tw/2, Math.max(tw,td)*0.7, td*1.3);
-  state.controls.target.set(tw/2, 0, td/2);
-  state.controls.update();
+  // Cadrage adaptatif : on calcule la BBOX RÉELLE des pièces
+  // (et non pas total_width qui peut être faux/manquant)
+  const bbox = computeModelBBox(data);
+  state._bbox = bbox;
+  fitLightsAndCameraToBBox(bbox);
 
   updateStats(data);
   updateRoomList(data);
+}
+
+// Calcule la bounding box réelle du modèle (pièces + murs)
+function computeModelBBox(data) {
+  let minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity;
+  (data.rooms || []).forEach(r => {
+    minX = Math.min(minX, r.x);
+    minZ = Math.min(minZ, r.z);
+    maxX = Math.max(maxX, r.x + r.width);
+    maxZ = Math.max(maxZ, r.z + r.depth);
+  });
+  (data.walls || []).forEach(w => {
+    minX = Math.min(minX, w.x - 1); maxX = Math.max(maxX, w.x + 1);
+    minZ = Math.min(minZ, w.z - 1); maxZ = Math.max(maxZ, w.z + 1);
+  });
+  if (!isFinite(minX)) { minX = 0; minZ = 0; maxX = 10; maxZ = 8; }
+  return { minX, minZ, maxX, maxZ, cx: (minX+maxX)/2, cz: (minZ+maxZ)/2, w: maxX-minX, d: maxZ-minZ };
+}
+
+function fitLightsAndCameraToBBox(b) {
+  const size = Math.max(b.w, b.d);
+  // Caméra : centrée sur le centre du modèle, en hauteur, légèrement reculée
+  state.camera.position.set(b.cx, size * 0.85, b.maxZ + size * 0.4);
+  state.controls.target.set(b.cx, 0, b.cz);
+  state.controls.maxDistance = size * 4;
+  state.controls.minDistance = 0.5;
+  state.controls.update();
+
+  // Soleil : positionné au-dessus du centre, décalé pour ombres
+  state.sun.position.set(b.cx + size * 0.6, size * 1.5 + 5, b.cz - size * 0.4);
+  state.sun.target.position.set(b.cx, 0, b.cz);
+  state.sun.target.updateMatrixWorld();
+  state.scene.add(state.sun.target);
+  // Frustum d'ombres adapté à la bbox
+  const pad = size * 0.7 + 5;
+  state.sun.shadow.camera.left = -pad;
+  state.sun.shadow.camera.right = pad;
+  state.sun.shadow.camera.top = pad;
+  state.sun.shadow.camera.bottom = -pad;
+  state.sun.shadow.camera.near = 0.5;
+  state.sun.shadow.camera.far = size * 4 + 20;
+  state.sun.shadow.camera.updateProjectionMatrix();
+  // En décalant le soleil dans le repère monde, il faut le positionner relativement au modèle
+  state.sun.shadow.camera.position.copy(state.sun.position);
 }
 
 function generateWallsFromRooms(rooms, tw, td, h, thick) {
@@ -1822,6 +1860,7 @@ function updateStats(data) {
 function setText(id, v) { const el = document.getElementById(id); if (el) el.textContent = v; }
 
 function updateRoomList(data) {
+  // Liste détaillée dans la sidebar (cachée par défaut)
   const list = document.getElementById('room-list');
   list.innerHTML = '';
   (data.rooms || []).forEach((room, i) => {
@@ -1835,7 +1874,36 @@ function updateRoomList(data) {
     d.onclick = e => { e.stopPropagation(); focusRoom(room); };
     list.appendChild(d);
   });
+
+  // Dropdown en bas (toujours visible quand un plan est chargé)
+  const sel = document.getElementById('room-select');
+  sel.innerHTML = '<option value="">📋 Aller à une pièce…</option>';
+  // groupe "Vue d'ensemble"
+  const optOverview = document.createElement('option');
+  optOverview.value = '__overview__';
+  optOverview.textContent = '🏠 Vue d\'ensemble';
+  sel.appendChild(optOverview);
+  (data.rooms || []).forEach((room, i) => {
+    const o = document.createElement('option');
+    o.value = String(i);
+    const area = ((room.width||0)*(room.depth||0)).toFixed(1);
+    o.textContent = `${room.name || 'Pièce ' + (i+1)} (${area} m²)`;
+    sel.appendChild(o);
+  });
 }
+
+window.onRoomSelect = function(value) {
+  if (!value) return;
+  if (value === '__overview__') {
+    if (state._bbox) fitLightsAndCameraToBBox(state._bbox);
+    return;
+  }
+  const idx = parseInt(value, 10);
+  const room = state.modelData?.rooms?.[idx];
+  if (room) focusRoom(room);
+  // Réinitialiser à la première option pour permettre re-sélection
+  document.getElementById('room-select').value = '';
+};
 
 function escapeHtml(s) { return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
@@ -1883,30 +1951,28 @@ window.toggleFullscreen = () => {
   else document.body.requestFullscreen();
 };
 window.resetCamera = () => {
-  if (state.modelData) {
-    const meta = state.modelData.metadata || {};
-    const tw = meta.total_width || 10, td = meta.total_depth || 8;
-    state.camera.position.set(tw/2, Math.max(tw,td)*0.7, td*1.3);
-    state.controls.target.set(tw/2, 0, td/2);
+  if (state._bbox) {
+    fitLightsAndCameraToBBox(state._bbox);
   } else {
     state.camera.position.set(8, 12, 14);
     state.controls.target.set(5, 0, 4);
+    state.controls.update();
   }
-  state.controls.update();
 };
 window.setMode = setMode;
 
 window.resetScene = () => {
-  [state.wallsGroup, state.roomsGroup, state.doorsGroup, state.windowsGroup, state.furnitureGroup].forEach(g => {
-    while (g.children.length) g.remove(g.children[0]);
+  [state.wallsGroup, state.roomsGroup, state.doorsGroup, state.windowsGroup, state.furnitureGroup, state.roofGroup].forEach(g => {
+    if (g) while (g.children.length) g.remove(g.children[0]);
   });
   if (state.floorMesh) { state.modelGroup.remove(state.floorMesh); state.floorMesh = null; }
-  state.modelData = null; state.hoveredRoom = null; state.furnitureItems = [];
+  state.modelData = null; state.hoveredRoom = null; state.furnitureItems = []; state._bbox = null;
   document.getElementById('upload-zone').classList.remove('hidden');
   document.getElementById('toolbar').classList.add('hidden');
   document.getElementById('sidebar').classList.add('hidden');
   document.getElementById('bottombar').classList.add('hidden');
   document.getElementById('furniture-panel').classList.add('hidden');
+  document.getElementById('room-selector').classList.add('hidden');
   document.getElementById('stats').style.opacity = '0';
   state.camera.position.set(8, 12, 14);
   state.controls.target.set(5, 0, 4);
@@ -2126,12 +2192,9 @@ window.closeModal = id => document.getElementById(id).classList.remove('show');
 // ─── UI helpers ───
 function showUI() {
   document.getElementById('toolbar').classList.remove('hidden');
-  const sidebar = document.getElementById('sidebar');
-  sidebar.classList.remove('hidden');
-  // Sync bouton toolbar
-  const btn = document.querySelector('#toolbar .tool[data-tooltip="Pièces & infos"]');
-  if (btn) btn.classList.add('active');
+  // La sidebar reste cachée par défaut (l'utilisateur peut l'ouvrir via 📋)
   document.getElementById('bottombar').classList.remove('hidden');
+  document.getElementById('room-selector').classList.remove('hidden');
   updateFurnitureCount();
 }
 function showLoading(t, sub) {
