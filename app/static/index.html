@@ -56,6 +56,20 @@ body{font-family:Inter,Segoe UI,system-ui,sans-serif;background:var(--bg);color:
 .tool-sep{height:1px;background:var(--b);margin:4px 2px}
 .tool[data-tooltip]:hover::after{content:attr(data-tooltip);position:absolute;left:46px;top:50%;transform:translateY(-50%);background:var(--s2);padding:4px 8px;border-radius:6px;font-size:11px;white-space:nowrap;color:var(--t);border:1px solid var(--b);box-shadow:var(--shadow);z-index:100}
 
+/* Barre de commande naturelle (en bas, au-dessus du dropdown) */
+#cmd-bar{position:absolute;bottom:54px;left:50%;transform:translateX(-50%);z-index:15;transition:opacity .3s;display:flex;gap:6px;align-items:center;width:min(560px, 90vw)}
+#cmd-bar.hidden{opacity:0;pointer-events:none}
+#cmd-input{flex:1;padding:10px 14px;border-radius:var(--rs);background:var(--panel);color:var(--t);border:1px solid var(--b);font-size:12px;font-family:inherit;backdrop-filter:blur(10px);outline:none;box-shadow:var(--shadow)}
+#cmd-input:focus{border-color:var(--a)}
+#cmd-input::placeholder{color:var(--t2);font-style:italic}
+#cmd-send{padding:10px 16px;border-radius:var(--rs);background:linear-gradient(135deg,var(--a),#4834d4);color:#fff;border:none;cursor:pointer;font-size:12px;font-weight:600;box-shadow:var(--shadow)}
+#cmd-send:hover{transform:translateY(-1px);box-shadow:0 4px 15px rgba(108,92,231,.4)}
+#cmd-send:disabled{opacity:.5;cursor:wait}
+
+/* Modal lecteur vidéo */
+#video-modal .modal-inner{max-width:700px}
+#video-modal video{width:100%;border-radius:8px;background:#000;margin-bottom:12px}
+
 /* Sélecteur de pièces (dropdown en bas, centré) */
 #room-selector{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);z-index:15;transition:opacity .3s}
 #room-selector.hidden{opacity:0;pointer-events:none}
@@ -210,6 +224,12 @@ canvas{display:block}
     <button class="tool" data-tooltip="Réinitialiser" onclick="resetScene()">🔄</button>
   </div>
 
+  <!-- Barre de commande naturelle (en bas, au-dessus du dropdown pièces) -->
+  <div id="cmd-bar" class="hidden">
+    <input id="cmd-input" type="text" placeholder='Ex: "ajoute une chambre 4×3 m avec lit et armoire"' maxlength="500">
+    <button id="cmd-send" onclick="sendCommand()">✨ Modifier</button>
+  </div>
+
   <!-- Sélecteur de pièces (dropdown en bas, n'occulte PAS la 3D) -->
   <div id="room-selector" class="hidden">
     <select id="room-select" onchange="onRoomSelect(this.value)">
@@ -325,6 +345,19 @@ canvas{display:block}
 </div>
 
 <!-- Modal édition pièce -->
+<!-- Modal lecteur vidéo -->
+<div class="modal" id="video-modal">
+  <div class="modal-inner">
+    <div class="modal-title">🎥 Visite enregistrée <button class="modal-close" onclick="closeModal('video-modal')">×</button></div>
+    <video id="video-player" controls autoplay></video>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-g" onclick="downloadRecordedVideo()" style="flex:1">⬇️ Télécharger (.webm)</button>
+      <button class="btn btn-o btn-g" onclick="closeModal('video-modal')" style="flex:0 0 auto">Fermer</button>
+    </div>
+    <div style="font-size:10px;color:var(--t2);margin-top:8px">Le fichier .webm s'enregistrera dans votre dossier <b>Téléchargements</b>.</div>
+  </div>
+</div>
+
 <div class="modal" id="edit-modal">
   <div class="modal-inner">
     <div class="modal-title">✏️ Modifier une pièce <button class="modal-close" onclick="closeModal('edit-modal')">×</button></div>
@@ -722,11 +755,18 @@ function animate() {
       drawMinimap();
     } else {
       state.controls.update();
-      // Hover de pièce désactivé (les sols sont maintenant simples et le sprite label flotte)
+    }
+    // Auto-cull du toit extérieur quand la caméra est basse (pour voir l'intérieur)
+    if (state.roofGroup && state.roofGroup.visible && state._roofPeak) {
+      const camY = state.camera.position.y;
+      const showExterior = camY > state._roofPeak * 0.85; // visible seulement vu d'au-dessus
+      state.roofGroup.children.forEach(c => {
+        if (c.userData?.kind === 'exterior') c.visible = showExterior;
+        else c.visible = true; // plafond intérieur toujours visible
+      });
     }
     state.renderer.render(state.scene, state.camera);
   } catch (e) {
-    // Un crash dans le rendu ne doit jamais tuer la boucle d'animation
     console.error('[animate] erreur :', e);
   }
 }
@@ -886,15 +926,29 @@ window.startCinematicTour = function() {
     try {
       const stream = state.renderer.domElement.captureStream(30);
       _tourChunks = [];
-      _tourRecorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
+      // mimeType : essai vp9 puis fallback vp8 puis defaults
+      let mimeType = 'video/webm;codecs=vp9';
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp8')
+          ? 'video/webm;codecs=vp8' : 'video/webm';
+      }
+      _tourRecorder = new MediaRecorder(stream, { mimeType });
       _tourRecorder.ondataavailable = e => { if (e.data.size > 0) _tourChunks.push(e.data); };
       _tourRecorder.onstop = () => {
+        if (!_tourChunks.length) {
+          toast('⚠️ Aucune frame enregistrée', 'error');
+          return;
+        }
         const blob = new Blob(_tourChunks, { type: 'video/webm' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url; a.download = `archiplan_tour_${Date.now()}.webm`; a.click();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-        toast('🎥 Vidéo enregistrée', 'success');
+        // Stocker l'URL pour le bouton de téléchargement du modal
+        if (state._lastVideoUrl) URL.revokeObjectURL(state._lastVideoUrl);
+        state._lastVideoUrl = URL.createObjectURL(blob);
+        // Afficher dans le modal AVEC un lecteur intégré + bouton télécharger
+        const player = document.getElementById('video-player');
+        player.src = state._lastVideoUrl;
+        player.load();
+        document.getElementById('video-modal').classList.add('show');
+        toast('🎥 Visite enregistrée — voir le lecteur', 'success');
       };
       _tourRecorder.start();
     } catch (e) {
@@ -1336,46 +1390,37 @@ function generateWallsFromRooms(rooms, tw, td, h, thick) {
 
 // ─── TOIT / PLAFOND ───
 function generateRoof(data, wallH, tw, td) {
-  // Plafond intérieur (visible quand on regarde de l'intérieur en mode visite)
+  // Plafond intérieur (toujours visible quand le toit est activé)
   const ceilMat = new THREE.MeshStandardMaterial({ color: '#f5f0e8', roughness: 0.95, side: THREE.DoubleSide });
   (data.rooms || []).forEach(room => {
     const rw = room.width || 3, rd = room.depth || 3;
     const g = new THREE.PlaneGeometry(rw, rd);
     const ceil = new THREE.Mesh(g, ceilMat);
-    ceil.rotation.x = Math.PI / 2; // tourné vers le bas
+    ceil.rotation.x = Math.PI / 2;
     ceil.position.set(room.x + rw/2, wallH - 0.01, room.z + rd/2);
     ceil.receiveShadow = true;
+    ceil.userData.kind = 'ceiling'; // intérieur — reste visible
     state.roofGroup.add(ceil);
   });
-  // Toiture extérieure en pente (style toit 4 pans tronqué)
+  // Toiture extérieure en pente
   const roofMat = new THREE.MeshStandardMaterial({ color: '#8b3e2e', roughness: 0.6 });
-  // une simple pyramide tronquée : 4 trapèzes
   const peak = wallH + Math.min(tw, td) * 0.25;
   const eaveOverhang = 0.5;
-  const Tw = tw + 2 * eaveOverhang, Td = td + 2 * eaveOverhang;
   const cx = tw / 2, cz = td / 2;
-
   const geom = new THREE.BufferGeometry();
   const v = (x,y,z) => [x,y,z];
   const verts = new Float32Array([
-    // base 4 coins
     ...v(-eaveOverhang, wallH, -eaveOverhang),
     ...v(tw+eaveOverhang, wallH, -eaveOverhang),
     ...v(tw+eaveOverhang, wallH, td+eaveOverhang),
     ...v(-eaveOverhang, wallH, td+eaveOverhang),
-    // sommet faîtière (2 points pour un toit à 2 pentes)
     ...v(cx, peak, td*0.3),
     ...v(cx, peak, td*0.7),
   ]);
-  // 6 faces (2 pignons + 2 pans + 2 triangles bouts)
   const idx = [
-    // Pan avant (vers Z=0) : v0, v1, v5 ; v0, v5, v4
     0,1,5, 0,5,4,
-    // Pan arrière (Z max) : v2, v3, v4 ; v2, v4, v5
     2,3,4, 2,4,5,
-    // Pignon gauche : v0, v4, v3
     0,4,3,
-    // Pignon droit : v1, v2, v5
     1,2,5,
   ];
   geom.setIndex(idx);
@@ -1383,7 +1428,11 @@ function generateRoof(data, wallH, tw, td) {
   geom.computeVertexNormals();
   const roof = new THREE.Mesh(geom, roofMat);
   roof.castShadow = true;
+  roof.userData.kind = 'exterior'; // extérieur — auto-masqué selon caméra
   state.roofGroup.add(roof);
+  // Mémoriser la hauteur du sommet pour l'auto-cull
+  state._roofPeak = peak;
+  state._wallHeight = wallH;
 }
 
 // ─── FURNITURE ───
@@ -2109,6 +2158,7 @@ window.resetScene = () => {
   document.getElementById('bottombar').classList.add('hidden');
   document.getElementById('furniture-panel').classList.add('hidden');
   document.getElementById('room-selector').classList.add('hidden');
+  document.getElementById('cmd-bar').classList.add('hidden');
   document.getElementById('stats').style.opacity = '0';
   state.camera.position.set(8, 12, 14);
   state.controls.target.set(5, 0, 4);
@@ -2126,8 +2176,16 @@ window.loadDemo = function() {
     .then(r => r.json())
     .then(json => {
       buildScene(json.model);
+      // Construire une analyse synthétique pour la commande IA depuis le modèle démo
+      state._lastAnalysis = {
+        rooms: json.model.rooms,
+        walls: [], doors: json.model.doors, windows: json.model.windows,
+        total_width: json.model.metadata?.total_width,
+        total_depth: json.model.metadata?.total_depth,
+      };
+      state.fileId = 'demo';
       showUI();
-      toast('🏠 Démo chargée', 'success');
+      toast('🏠 Démo chargée — vous pouvez taper "ajoute une chambre" en bas', 'success');
     })
     .catch(e => {
       toast('❌ ' + e.message, 'error');
@@ -2163,6 +2221,7 @@ window.uploadFile = function(file) {
       if (json.analysis?.error) throw new Error(json.analysis.error);
       if (!json.analysis?.rooms?.length) throw new Error('Aucune pièce détectée dans ce plan');
       state.fileId = json.file_id;
+      state._lastAnalysis = json.analysis; // pour la commande IA
       showLoading('🏗️ Construction du modèle 3D...', `${json.analysis.rooms.length} pièces détectées`);
       return fetch('/api/build-3d', {
         method: 'POST',
@@ -2205,6 +2264,63 @@ window.exportSTL = function() {
     downloadText(text, `archiplan_${state.fileId || 'model'}.stl`, 'application/sla');
     toast('🖨️ STL téléchargé — ouvrir dans Revit, AutoCAD, Cura', 'success');
   } catch (e) { toast('❌ Export STL : ' + e.message, 'error'); }
+};
+
+// ─── COMMANDE NATURELLE (IA) ───
+window.sendCommand = async function() {
+  if (!state.modelData) return toast('Chargez un plan d\'abord', 'error');
+  const inp = document.getElementById('cmd-input');
+  const text = (inp.value || '').trim();
+  if (!text) return;
+  const btn = document.getElementById('cmd-send');
+  btn.disabled = true;
+  btn.textContent = '⌛ IA…';
+  showLoading('🤖 L\'IA modifie votre plan…', text.slice(0, 80));
+  try {
+    const r = await fetch('/api/modify-plan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ analysis: state._lastAnalysis || state.modelData, instruction: text }),
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      throw new Error(err.detail || 'Erreur ' + r.status);
+    }
+    const json = await r.json();
+    state._lastAnalysis = json.analysis;
+    // Reconstruire le modèle 3D
+    const br = await fetch('/api/build-3d', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ analysis: json.analysis, file_id: state.fileId || 'modified' }),
+    });
+    const bj = await br.json();
+    buildScene(bj.model);
+    inp.value = '';
+    toast('✅ Modèle modifié — ' + text.slice(0, 60), 'success');
+  } catch (e) {
+    toast('❌ ' + e.message, 'error');
+  } finally {
+    hideLoading();
+    btn.disabled = false;
+    btn.textContent = '✨ Modifier';
+  }
+};
+
+// Permettre Enter pour envoyer la commande
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.activeElement?.id === 'cmd-input') {
+    sendCommand();
+  }
+});
+
+// ─── VIDÉO TÉLÉCHARGEMENT ───
+window.downloadRecordedVideo = function() {
+  if (!state._lastVideoUrl) return toast('Aucune vidéo disponible', 'error');
+  const a = document.createElement('a');
+  a.href = state._lastVideoUrl;
+  a.download = `archiplan_visite_${Date.now()}.webm`;
+  a.click();
+  toast('⬇️ Vidéo téléchargée dans Téléchargements', 'success');
 };
 
 window.exportGLTF = function() {
@@ -2338,9 +2454,9 @@ window.closeModal = id => document.getElementById(id).classList.remove('show');
 // ─── UI helpers ───
 function showUI() {
   document.getElementById('toolbar').classList.remove('hidden');
-  // La sidebar reste cachée par défaut (l'utilisateur peut l'ouvrir via 📋)
   document.getElementById('bottombar').classList.remove('hidden');
   document.getElementById('room-selector').classList.remove('hidden');
+  document.getElementById('cmd-bar').classList.remove('hidden');
   updateFurnitureCount();
 }
 function showLoading(t, sub) {

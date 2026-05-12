@@ -845,6 +845,61 @@ def _run_deploy_async() -> None:
         logger.error("Échec lancement déploiement: %s", exc)
 
 
+@app.post("/api/modify-plan")
+async def modify_plan(payload: dict):
+    """Modifie un plan via IA depuis une commande en langage naturel.
+
+    Body : {
+        "analysis": <analyse actuelle>,
+        "instruction": "Ajoute une chambre 4x3 m avec lit et armoire"
+    }
+    Retourne l'analyse modifiée.
+    """
+    analysis = payload.get("analysis")
+    instruction = (payload.get("instruction") or "").strip()
+    if not analysis or not isinstance(analysis, dict):
+        raise HTTPException(400, "Analyse requise.")
+    if not instruction:
+        raise HTTPException(400, "Instruction requise (ex: « ajoute une chambre »).")
+    if len(instruction) > 1000:
+        raise HTTPException(400, "Instruction trop longue (max 1000 caractères).")
+
+    prompt = f"""Tu es un expert en architecture. Voici un plan 2D au format JSON :
+
+{json.dumps(analysis, ensure_ascii=False, indent=2)}
+
+L'utilisateur demande : « {instruction} »
+
+INSTRUCTION : applique cette demande et retourne le JSON MODIFIÉ avec la même structure.
+- Conserve toutes les pièces, murs, portes, fenêtres existants sauf si la demande dit de les supprimer.
+- Si on ajoute une pièce, place-la sur un côté libre du bâtiment sans chevaucher.
+- Ajuste total_width / total_depth si nécessaire.
+- Mets un type ("living", "kitchen", "bedroom", "bathroom", "wc", "office", "hallway", "entrance", "storage", "garage", "dining", "other") sur chaque pièce.
+- Si l'utilisateur précise des meubles, ajoute un tableau "furniture" dans la pièce concernée avec :
+  [{{"type": "bed", "x": <relatif>, "z": <relatif>}}, ...]
+
+Retourne UNIQUEMENT le JSON modifié, rien d'autre, sans markdown."""
+
+    messages = [{"role": "user", "content": prompt}]
+
+    last_error = None
+    for model in MODELS:
+        try:
+            logger.info("[MODIFY] model=%s instruction=%s", model, instruction[:80])
+            raw = await call_openrouter(messages, model)
+            parsed = extract_json(raw)
+            if validate_analysis(parsed):
+                logger.info("[MODIFY] SUCCESS pièces=%d", len(parsed.get("rooms", [])))
+                parsed["_meta"] = {"source": f"{model} (modify)", "instruction": instruction}
+                return {"status": "success", "analysis": parsed}
+            last_error = f"{model}: réponse invalide"
+        except Exception as e:
+            logger.warning("[MODIFY] %s : %s", model, e)
+            last_error = str(e)
+
+    raise HTTPException(502, f"Impossible d'appliquer la modification. {last_error or ''}")
+
+
 @app.post("/api/deploy")
 async def github_webhook(request: Request):
     """
