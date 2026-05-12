@@ -198,8 +198,9 @@ canvas{display:block}
     <button class="tool" data-tooltip="Toit / Plafond" id="tool-roof" onclick="toggleRoof()">🏠</button>
     <button class="tool" data-tooltip="Tour automatique" id="tool-tour" onclick="startCinematicTour()">🎬</button>
     <div class="tool-sep"></div>
-    <button class="tool" data-tooltip="Export OBJ" onclick="exportOBJ()">📦</button>
-    <button class="tool" data-tooltip="Export glTF" onclick="exportGLTF()">📐</button>
+    <button class="tool" data-tooltip="Export OBJ (Blender, SketchUp)" onclick="exportOBJ()">📦</button>
+    <button class="tool" data-tooltip="Export glTF (web, Three.js)" onclick="exportGLTF()">📐</button>
+    <button class="tool" data-tooltip="Export STL (3D-print, Revit, AutoCAD)" onclick="exportSTL()">🖨️</button>
     <button class="tool" data-tooltip="Screenshot PNG" onclick="exportScreenshot()">📸</button>
     <button class="tool" data-tooltip="Rapport JSON" onclick="exportReport()">📊</button>
     <div class="tool-sep"></div>
@@ -353,6 +354,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import { OBJExporter } from 'three/addons/exporters/OBJExporter.js';
+import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 
 // ─── STATE ───
 const state = {
@@ -486,6 +488,18 @@ function initScene() {
   state.renderer.toneMapping = THREE.ACESFilmicToneMapping;
   state.renderer.toneMappingExposure = 1.15;
   document.getElementById('viewer').appendChild(state.renderer.domElement);
+
+  // Gestion de la perte de contexte WebGL — empêche l'écran noir définitif
+  state.renderer.domElement.addEventListener('webglcontextlost', e => {
+    e.preventDefault();
+    console.warn('[WebGL] contexte perdu — tentative de récupération');
+    toast('⚠️ Contexte WebGL perdu — récupération…', 'error');
+  }, false);
+  state.renderer.domElement.addEventListener('webglcontextrestored', () => {
+    console.log('[WebGL] contexte restauré');
+    if (state.modelData) buildScene(state.modelData);
+    toast('✅ Récupéré', 'success');
+  }, false);
 
   state.scene = new THREE.Scene();
   state.scene.background = new THREE.Color(isLight ? '#dde0e6' : '#0a0a14');
@@ -1111,26 +1125,25 @@ function buildScene(data) {
   state.floorMesh.receiveShadow = true;
   state.modelGroup.add(state.floorMesh);
 
-  // Étiquettes flottantes des pièces (PLUS de sol coloré, on évite tout z-fight)
-  // Le parquet général sert de sol, les pièces sont identifiées par sprite et meubles.
-  (data.rooms || []).forEach((room, i) => {
-    const rw = room.width || 3, rd = room.depth || 3;
-    const color = room.color || COLORS[i % COLORS.length];
-    const label = makeTextSprite(room.name || `Pièce ${i+1}`, color);
-    label.position.set(room.x + rw/2, 1.8, room.z + rd/2);
-    label.userData = { isLabel: true, room, idx: i };
-    state.roomsGroup.add(label);
-  });
+  // PAS de sprite labels — ils étaient rendus avec depthTest:false donc
+  // toujours visibles au-dessus de la 3D. Quand l'utilisateur tournait la
+  // caméra, plusieurs sprites se superposaient et masquaient le bâtiment.
+  // Les pièces sont identifiables par : murs + meubles + dropdown bas.
 
   // Walls
   const wallMat = new THREE.MeshStandardMaterial({
     map: state.textures.wall, color: '#f5f0e8', roughness: 0.7,
   });
   (data.walls || []).forEach(w => {
-    const g = new THREE.BoxGeometry(w.length, h, thick);
+    // Validation : éviter NaN, longueurs nulles ou négatives (corrompent le rendu)
+    const len = Number(w.length);
+    if (!isFinite(len) || len <= 0.05) return;
+    const wx = Number(w.x), wz = Number(w.z);
+    if (!isFinite(wx) || !isFinite(wz)) return;
+    const g = new THREE.BoxGeometry(len, h, thick);
     const mesh = new THREE.Mesh(g, wallMat.clone());
-    mesh.position.set(w.x, h/2, w.z);
-    mesh.rotation.y = w.rotation || 0;
+    mesh.position.set(wx, h/2, wz);
+    mesh.rotation.y = Number(w.rotation) || 0;
     mesh.castShadow = true; mesh.receiveShadow = true;
     state.wallsGroup.add(mesh);
   });
@@ -1187,7 +1200,11 @@ function buildScene(data) {
   // Auto furniture
   autoPlaceFurniture(data.rooms || []);
 
-  // Lampes plafond auto pour les pièces principales
+  // Lampes plafond auto — LIMITÉES à 4 PointLights pour ne pas dépasser
+  // les limites WebGL (la plupart des GPU acceptent ~4-8 lights max).
+  // Au-delà, on désactive le PointLight et on garde juste le mesh visuel.
+  let lampLightCount = 0;
+  const MAX_POINT_LIGHTS = 4;
   (data.rooms || []).forEach(room => {
     const t = (room.type || '').toLowerCase();
     const n = (room.name || '').toLowerCase();
@@ -1195,7 +1212,12 @@ function buildScene(data) {
     const major = /living|salon|kitchen|cuisin|bedroom|chambre|dining|bureau/.test(t + ' ' + n);
     if (!major && area < 7) return;
     const lamp = createFurnitureMesh('ceiling_lamp');
-    // Origine du modèle = plafond, donc y = wall height
+    // Retirer la PointLight si on a déjà atteint la limite
+    if (lampLightCount >= MAX_POINT_LIGHTS) {
+      lamp.traverse(o => { if (o.isPointLight) lamp.remove(o); });
+    } else {
+      lampLightCount++;
+    }
     lamp.position.set(room.x + room.width/2, h, room.z + room.depth/2);
     state.furnitureGroup.add(lamp);
     state.furnitureItems.push({ type: 'ceiling_lamp', mesh: lamp });
@@ -2171,8 +2193,18 @@ window.exportOBJ = function() {
     const exporter = new OBJExporter();
     const text = exporter.parse(state.modelGroup);
     downloadText(text, `archiplan_${state.fileId || 'model'}.obj`, 'text/plain');
-    toast('📦 Export OBJ téléchargé', 'success');
+    toast('📦 OBJ téléchargé — ouvrir dans Blender, SketchUp, 3ds Max', 'success');
   } catch (e) { toast('❌ Export OBJ : ' + e.message, 'error'); }
+};
+
+window.exportSTL = function() {
+  if (!state.modelData) return toast('Aucun modèle à exporter', 'error');
+  try {
+    const exporter = new STLExporter();
+    const text = exporter.parse(state.modelGroup, { binary: false });
+    downloadText(text, `archiplan_${state.fileId || 'model'}.stl`, 'application/sla');
+    toast('🖨️ STL téléchargé — ouvrir dans Revit, AutoCAD, Cura', 'success');
+  } catch (e) { toast('❌ Export STL : ' + e.message, 'error'); }
 };
 
 window.exportGLTF = function() {
