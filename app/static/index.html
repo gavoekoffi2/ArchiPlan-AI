@@ -388,6 +388,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import { OBJExporter } from 'three/addons/exporters/OBJExporter.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 
 // ─── STATE ───
 const state = {
@@ -957,39 +958,68 @@ window.startCinematicTour = function() {
     }
   }
 
-  // Construit la trajectoire : vue d'ensemble → entrée → chaque pièce → vue finale
+  // Construit la trajectoire : promenade lente, vues larges depuis coins.
+  // Objectif : voir CHAQUE pièce dans son ensemble, comme une personne qui
+  // marche et regarde autour. Pas de zoom serré sur un meuble.
   const meta = state.modelData.metadata || {};
-  const tw = meta.total_width || 10, td = meta.total_depth || 8;
-  const overviewHi = new THREE.Vector3(tw/2, Math.max(tw,td)*0.9, td*1.5);
-  const overviewLo = new THREE.Vector3(tw/2, Math.max(tw,td)*0.5, td*1.1);
+  const bbox = state._bbox || { cx: (meta.total_width||10)/2, cz: (meta.total_depth||8)/2, w: meta.total_width||10, d: meta.total_depth||8, maxZ: meta.total_depth||8 };
+  const size = Math.max(bbox.w, bbox.d);
+  const overviewHi = new THREE.Vector3(bbox.cx, size*0.95, bbox.cz + size*0.7);
+  const overviewLo = new THREE.Vector3(bbox.cx, size*0.55, bbox.cz + size*0.55);
   const waypoints = [];
-  // Vue d'ensemble
-  waypoints.push({ pos: overviewHi, look: new THREE.Vector3(tw/2, 0, td/2), dur: 1500 });
-  waypoints.push({ pos: overviewLo, look: new THREE.Vector3(tw/2, 0, td/2), dur: 1500 });
-  // Chaque pièce : caméra à 1.7m du sol au centre, regardant un meuble notable
+
+  // FOV élargi pendant la visite cinématographique pour voir plus large
+  state._savedFov = state.camera.fov;
+  state.camera.fov = 72;
+  state.camera.updateProjectionMatrix();
+  // Cacher le toit extérieur pour ne pas masquer les pièces
+  if (state.roofGroup.visible) {
+    state._roofWasVisible = true;
+    state.roofGroup.visible = false;
+  }
+
+  // 1. Vue d'ensemble (du haut → légèrement plus bas)
+  waypoints.push({ pos: overviewHi.clone(), look: new THREE.Vector3(bbox.cx, 0, bbox.cz), dur: 2500 });
+  waypoints.push({ pos: overviewLo.clone(), look: new THREE.Vector3(bbox.cx, 0, bbox.cz), dur: 2500 });
+
+  // 2. Pour chaque pièce : 3 plans depuis 3 coins différents pour voir l'ensemble
   state.modelData.rooms.forEach((r, i) => {
     const cx = r.x + r.width/2, cz = r.z + r.depth/2;
-    // Entrée de la pièce (depuis l'extérieur si possible)
+    const margin = 0.3;
+    const eyeHeight = 1.65;
+    const lookHeight = 1.30;
+    const name = r.name || `Pièce ${i+1}`;
+
+    // Plan 1 : depuis le coin "haut-gauche" (entrée typique), vue diagonale vers coin opposé
     waypoints.push({
-      pos: new THREE.Vector3(cx, 1.7, cz - r.depth * 0.4),
-      look: new THREE.Vector3(cx, 1.4, cz + r.depth * 0.3),
-      dur: 2000,
-      label: r.name || `Pièce ${i+1}`,
+      pos: new THREE.Vector3(r.x + margin, eyeHeight, r.z + margin),
+      look: new THREE.Vector3(r.x + r.width - margin, lookHeight, r.z + r.depth - margin),
+      dur: 3500,
+      label: name,
+      labelSub: `${r.width.toFixed(1)}×${r.depth.toFixed(1)} m`,
     });
-    // Tour de 360° dans la pièce
+    // Plan 2 : depuis le coin opposé, vue retour
     waypoints.push({
-      pos: new THREE.Vector3(cx, 1.7, cz),
-      look: new THREE.Vector3(cx + r.width * 0.5, 1.4, cz),
-      dur: 1500,
+      pos: new THREE.Vector3(r.x + r.width - margin, eyeHeight, r.z + r.depth - margin),
+      look: new THREE.Vector3(r.x + margin, lookHeight, r.z + margin),
+      dur: 3500,
+    });
+    // Plan 3 : balayage panoramique depuis le centre
+    waypoints.push({
+      pos: new THREE.Vector3(cx, eyeHeight, cz),
+      look: new THREE.Vector3(cx + r.width * 0.4, lookHeight, cz - r.depth * 0.4),
+      dur: 2500,
     });
     waypoints.push({
-      pos: new THREE.Vector3(cx, 1.7, cz),
-      look: new THREE.Vector3(cx, 1.4, cz - r.depth * 0.5),
-      dur: 1500,
+      pos: new THREE.Vector3(cx, eyeHeight, cz),
+      look: new THREE.Vector3(cx - r.width * 0.4, lookHeight, cz + r.depth * 0.4),
+      dur: 2500,
     });
   });
-  // Vue finale
-  waypoints.push({ pos: overviewHi, look: new THREE.Vector3(tw/2, 0, td/2), dur: 2000 });
+
+  // 3. Plan final : remontée vers vue d'ensemble haute
+  waypoints.push({ pos: overviewLo.clone(), look: new THREE.Vector3(bbox.cx, 0, bbox.cz), dur: 2500 });
+  waypoints.push({ pos: overviewHi.clone(), look: new THREE.Vector3(bbox.cx, 0, bbox.cz), dur: 3000 });
 
   runWaypointAnimation(waypoints, 0);
 };
@@ -1030,6 +1060,17 @@ function finishCinematicTour() {
   document.getElementById('tool-tour').classList.remove('active');
   if (_tourRecorder && _tourRecorder.state === 'recording') {
     _tourRecorder.stop();
+  }
+  // Restaurer FOV original
+  if (state._savedFov) {
+    state.camera.fov = state._savedFov;
+    state.camera.updateProjectionMatrix();
+    state._savedFov = null;
+  }
+  // Restaurer le toit s'il était visible
+  if (state._roofWasVisible) {
+    state.roofGroup.visible = true;
+    state._roofWasVisible = false;
   }
   toast('Tour terminé');
 }
@@ -1655,56 +1696,115 @@ function createFurnitureMesh(type) {
     me.position.set(x,y,z); me.castShadow = true; me.receiveShadow = true;
     return me;
   };
+  // Variante avec coins ARRONDIS (plus réaliste pour matelas, coussins, plateaux)
+  const rmk = (w,h,d,m,x,y,z,radius=0.04) => {
+    const r = Math.min(radius, Math.min(w,h,d) * 0.4);
+    const me = new THREE.Mesh(new THREE.RoundedBoxGeometry(w,h,d, 4, r), m);
+    me.position.set(x,y,z); me.castShadow = true; me.receiveShadow = true;
+    return me;
+  };
   const mkCyl = (rt, rb, h, m, x, y, z) => {
     const me = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, 24), m);
     me.position.set(x,y,z); me.castShadow = true; me.receiveShadow = true;
     return me;
   };
+  // Sphère ovoïde (pour oreillers, coussins, fruits...)
+  const mkSphere = (rx, ry, rz, m, x, y, z) => {
+    const me = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), m);
+    me.scale.set(rx, ry, rz);
+    me.position.set(x,y,z); me.castShadow = true; me.receiveShadow = true;
+    return me;
+  };
 
   switch (type) {
-    case 'table':
-      // table basse de salon : 1m × 0.6m, hauteur 0.45m
-      group.add(mk(1.0, 0.04, 0.6, wood, 0, 0.45, 0));
+    case 'table': {
+      // Table basse moderne avec plateau arrondi
+      group.add(rmk(1.0, 0.04, 0.6, wood, 0, 0.45, 0, 0.02));
       [-0.45, 0.45].forEach(x => [-0.25, 0.25].forEach(z => {
-        group.add(mk(0.05, 0.43, 0.05, woodDark, x, 0.215, z));
+        group.add(rmk(0.05, 0.43, 0.05, woodDark, x, 0.215, z, 0.01));
       }));
-      // déco : livre + tasse
-      group.add(mk(0.18, 0.03, 0.25, fabric, -0.25, 0.49, 0));
-      group.add(mkCyl(0.05, 0.05, 0.08, white, 0.2, 0.51, 0.05));
+      // Étagère basse
+      group.add(rmk(0.9, 0.02, 0.5, woodDark, 0, 0.15, 0, 0.01));
+      // Déco : pile de livres aux couleurs variées
+      const bookCols = ['#a83a3a','#3a6caa','#3aaa6a','#aa8a3a'];
+      for (let i = 0; i < 3; i++) {
+        const bMat = new THREE.MeshStandardMaterial({color:bookCols[i],roughness:.7});
+        group.add(rmk(0.18, 0.025, 0.22, bMat, -0.28, 0.49 + i*0.026, 0, 0.005));
+      }
+      // Tasse de café
+      group.add(mkCyl(0.045, 0.04, 0.08, white, 0.2, 0.49, 0.05));
+      // anse de la tasse
+      const handle = new THREE.Mesh(new THREE.TorusGeometry(0.03, 0.008, 8, 16), white);
+      handle.position.set(0.25, 0.51, 0.05); handle.rotation.y = Math.PI/2;
+      handle.castShadow = true; group.add(handle);
+      // Vase central avec fleurs
+      group.add(mkCyl(0.06, 0.05, 0.18, new THREE.MeshStandardMaterial({color:'#5a7a9a',roughness:.2,metalness:.3}), 0.15, 0.55, -0.15));
+      group.add(mkSphere(0.05, 0.07, 0.05, new THREE.MeshStandardMaterial({color:'#c43a5a'}), 0.15, 0.70, -0.15));
+      group.add(mkSphere(0.05, 0.07, 0.05, new THREE.MeshStandardMaterial({color:'#fadc3a'}), 0.18, 0.71, -0.13));
       break;
+    }
 
-    case 'dining_table':
-      // table à manger : 1.6m × 0.9m
-      group.add(mk(1.6, 0.05, 0.9, wood, 0, 0.74, 0));
+    case 'dining_table': {
+      // Table à manger en bois massif, plateau arrondi
+      group.add(rmk(1.6, 0.05, 0.9, wood, 0, 0.74, 0, 0.03));
       [-0.7, 0.7].forEach(x => [-0.4, 0.4].forEach(z => {
-        group.add(mk(0.06, 0.72, 0.06, woodDark, x, 0.36, z));
+        group.add(rmk(0.06, 0.72, 0.06, woodDark, x, 0.36, z, 0.012));
       }));
+      // Mise en place : 4 assiettes (cylindres très fins)
+      [{x:-0.5,z:-0.3},{x:0.5,z:-0.3},{x:-0.5,z:0.3},{x:0.5,z:0.3}].forEach(p => {
+        const plate = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.012, 24), porcelain);
+        plate.position.set(p.x, 0.77, p.z); plate.castShadow = true; plate.receiveShadow = true;
+        group.add(plate);
+        // verre
+        const glass = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.030, 0.10, 16), new THREE.MeshStandardMaterial({color:'#cfe4ee',transparent:true,opacity:.5,roughness:.05}));
+        glass.position.set(p.x + 0.15, 0.82, p.z - 0.15);
+        group.add(glass);
+      });
+      // Chemin de table central
+      const runner = new THREE.MeshStandardMaterial({ color:'#c4b8a8', roughness:.85 });
+      group.add(mk(1.3, 0.005, 0.3, runner, 0, 0.768, 0));
       break;
+    }
 
-    case 'chair':
-      group.add(mk(0.42, 0.04, 0.42, woodDark, 0, 0.45, 0));
-      group.add(mk(0.42, 0.5, 0.04, woodDark, 0, 0.7, -0.19));
+    case 'chair': {
+      // Chaise contemporaine avec assise arrondie
+      group.add(rmk(0.42, 0.05, 0.42, woodDark, 0, 0.45, 0, 0.02));
+      group.add(rmk(0.42, 0.5, 0.04, woodDark, 0, 0.7, -0.19, 0.015));
       [-0.18, 0.18].forEach(x => [-0.18, 0.18].forEach(z => {
-        group.add(mk(0.04, 0.43, 0.04, woodDark, x, 0.22, z));
+        group.add(rmk(0.04, 0.43, 0.04, woodDark, x, 0.22, z, 0.008));
       }));
-      // coussin
-      group.add(mk(0.38, 0.04, 0.38, fabricLight, 0, 0.48, 0));
+      // Coussin arrondi
+      group.add(rmk(0.38, 0.05, 0.38, fabricLight, 0, 0.485, 0, 0.025));
       break;
+    }
 
-    case 'bed':
-      // lit double 160×210 cm, tête de lit à l'arrière (z négatif)
-      // structure
-      group.add(mk(1.65, 0.2, 2.1, wood, 0, 0.15, 0));
-      // matelas
-      group.add(mk(1.6, 0.18, 2.0, white, 0, 0.34, 0));
-      // couette
-      group.add(mk(1.6, 0.08, 1.55, fabric, 0, 0.47, 0.25));
-      // 2 oreillers à la tête (côté -z)
-      group.add(mk(0.65, 0.12, 0.42, white, -0.4, 0.46, -0.78));
-      group.add(mk(0.65, 0.12, 0.42, white, 0.4, 0.46, -0.78));
-      // tête de lit
-      group.add(mk(1.7, 0.9, 0.08, woodDark, 0, 0.6, -1.06));
+    case 'bed': {
+      // Lit double, look hôtel haut de gamme
+      // structure bois
+      group.add(rmk(1.7, 0.18, 2.15, wood, 0, 0.13, 0, 0.025));
+      // matelas blanc arrondi
+      group.add(rmk(1.6, 0.22, 2.0, white, 0, 0.33, 0, 0.04));
+      // drap dessous (couverture en couleur)
+      const cover = new THREE.MeshStandardMaterial({ color:'#3a5a8c', roughness:.85 });
+      group.add(rmk(1.6, 0.06, 1.4, cover, 0, 0.47, 0.3, 0.02));
+      // bord du drap blanc
+      group.add(rmk(1.6, 0.04, 0.15, white, 0, 0.48, -0.4, 0.015));
+      // 2 oreillers arrondis
+      [-0.4, 0.4].forEach(x => group.add(rmk(0.65, 0.14, 0.42, white, x, 0.49, -0.75, 0.05)));
+      // 2 petits coussins déco
+      group.add(rmk(0.4, 0.08, 0.3, fabric, -0.3, 0.55, -0.55, 0.03));
+      group.add(rmk(0.4, 0.08, 0.3, new THREE.MeshStandardMaterial({color:'#c87a4a'}), 0.3, 0.55, -0.55, 0.03));
+      // Tête de lit capitonnée
+      group.add(rmk(1.75, 1.0, 0.12, woodDark, 0, 0.65, -1.08, 0.04));
+      // boutons capitonnage
+      for (let cx = -0.6; cx <= 0.6; cx += 0.3) {
+        for (let cy = 0.45; cy <= 0.95; cy += 0.25) {
+          const btn = new THREE.Mesh(new THREE.SphereGeometry(0.02, 8, 6), metal);
+          btn.position.set(cx, cy, -1.02); group.add(btn);
+        }
+      }
       break;
+    }
 
     case 'nightstand':
       group.add(mk(0.5, 0.55, 0.45, wood, 0, 0.275, 0));
@@ -1720,27 +1820,39 @@ function createFurnitureMesh(type) {
       group.add(mkCyl(0.2, 0.3, 0.3, cream, 0, 1.45, 0));
       break;
 
-    case 'sofa':
-      // canapé 3 places 2.3m
-      // base
-      group.add(mk(2.3, 0.35, 0.95, fabric, 0, 0.22, 0));
-      // dossier
-      group.add(mk(2.3, 0.55, 0.18, fabric, 0, 0.67, -0.385));
-      // accoudoirs
-      group.add(mk(0.18, 0.5, 0.95, fabric, -1.06, 0.3, 0));
-      group.add(mk(0.18, 0.5, 0.95, fabric, 1.06, 0.3, 0));
-      // 3 coussins
+    case 'sofa': {
+      // Canapé moderne 3 places avec coussins arrondis et accoudoirs sculptés
+      // Base arrondie
+      group.add(rmk(2.3, 0.35, 0.95, fabric, 0, 0.22, 0, 0.06));
+      // Dossier arrondi
+      group.add(rmk(2.3, 0.55, 0.2, fabric, 0, 0.67, -0.38, 0.06));
+      // Accoudoirs arrondis
+      group.add(rmk(0.2, 0.5, 0.95, fabric, -1.06, 0.3, 0, 0.06));
+      group.add(rmk(0.2, 0.5, 0.95, fabric, 1.06, 0.3, 0, 0.06));
+      // 3 coussins assise très arrondis (capsule-like)
       [-0.7, 0, 0.7].forEach(x => {
-        group.add(mk(0.62, 0.18, 0.65, fabricLight, x, 0.49, 0.05));
+        group.add(rmk(0.65, 0.18, 0.7, fabricLight, x, 0.5, 0.05, 0.08));
       });
-      // 2 coussins déco dossier
-      group.add(mk(0.3, 0.3, 0.08, white, -0.7, 0.55, -0.3));
-      group.add(mk(0.3, 0.3, 0.08, cream, 0.7, 0.55, -0.3));
+      // 4 coussins déco rebondis sur le dossier (couleurs variées)
+      const cushionMats = [
+        new THREE.MeshStandardMaterial({color:'#e8e0d0',roughness:.85}),
+        new THREE.MeshStandardMaterial({color:'#a83a3a',roughness:.8}),
+        new THREE.MeshStandardMaterial({color:'#3a6a8a',roughness:.85}),
+        new THREE.MeshStandardMaterial({color:'#c47a3a',roughness:.8}),
+      ];
+      [-0.85, -0.3, 0.3, 0.85].forEach((x, i) => {
+        const cu = rmk(0.35, 0.32, 0.12, cushionMats[i], x, 0.6, -0.3, 0.06);
+        cu.rotation.z = (Math.random() - 0.5) * 0.2; // léger désordre naturel
+        group.add(cu);
+      });
+      // plaid (couverture) sur un côté
+      group.add(rmk(0.7, 0.04, 0.45, new THREE.MeshStandardMaterial({color:'#8a4a3a',roughness:.9}), 0.6, 0.42, 0.2, 0.02));
       // pieds
       [-1.0, 1.0].forEach(x => [-0.4, 0.4].forEach(z => {
         group.add(mk(0.06, 0.05, 0.06, dark, x, 0.025, z));
       }));
       break;
+    }
 
     case 'kitchen':
       // bloc cuisine 2.1m : 2 modules bas + plan de travail + plaque + hotte
@@ -1824,22 +1936,56 @@ function createFurnitureMesh(type) {
       group.add(mk(0.4, 0.25, 0.02, screen, -0.3, 0.89, -0.13));
       break;
 
-    case 'bookshelf':
-      group.add(mk(1.0, 1.9, 0.35, wood, 0, 0.95, 0));
-      // étagères
+    case 'bookshelf': {
+      // Bibliothèque enrichie : 5 niveaux, livres, objets déco
+      group.add(rmk(1.0, 1.9, 0.35, wood, 0, 0.95, 0, 0.02));
+      // fond
+      group.add(mk(0.96, 1.86, 0.02, woodDark, 0, 0.95, -0.16));
       for (let i = 1; i <= 4; i++) {
-        group.add(mk(0.96, 0.03, 0.33, woodDark, 0, i * 0.38, 0));
+        group.add(rmk(0.96, 0.03, 0.33, woodDark, 0, i * 0.38, 0, 0.005));
       }
-      // livres aléatoires
-      const bookColors = ['#aa3a3a','#3a6caa','#3aaa6a','#aa8a3a','#7a3aaa'];
+      const bookColors = ['#a83a3a','#3a6caa','#3aaa6a','#aa8a3a','#7a3aaa','#3a8a8a','#aa5a3a','#5a3a8a','#aa3a8a','#3aaa3a'];
       for (let shelf = 0; shelf < 4; shelf++) {
-        for (let b = 0; b < 8; b++) {
-          const bc = new THREE.MeshStandardMaterial({ color: bookColors[(shelf+b)%5], roughness: 0.7 });
-          const bw = 0.05 + Math.random() * 0.04;
-          group.add(mk(bw, 0.3, 0.22, bc, -0.4 + b * 0.1, 0.38 * shelf + 0.55, 0.04));
+        let x = -0.42;
+        // Mélange : livres verticaux + horizontal + objet déco
+        while (x < 0.42) {
+          const r = Math.random();
+          if (r < 0.7) {
+            // livre vertical
+            const bc = new THREE.MeshStandardMaterial({ color: bookColors[Math.floor(Math.random()*bookColors.length)], roughness: 0.75 });
+            const bw = 0.04 + Math.random() * 0.05;
+            const bh = 0.22 + Math.random() * 0.1;
+            group.add(rmk(bw, bh, 0.22, bc, x + bw/2, 0.38 * shelf + 0.18 + bh/2, 0.04, 0.005));
+            x += bw + 0.005;
+          } else if (r < 0.88) {
+            // pile horizontale 3 livres
+            for (let k = 0; k < 3; k++) {
+              const bc = new THREE.MeshStandardMaterial({ color: bookColors[Math.floor(Math.random()*bookColors.length)], roughness: 0.75 });
+              group.add(rmk(0.14, 0.03, 0.22, bc, x + 0.07, 0.38 * shelf + 0.19 + k * 0.032, 0.04, 0.005));
+            }
+            x += 0.16;
+          } else {
+            // objet déco : vase ou figurine
+            if (Math.random() > 0.5) {
+              group.add(mkCyl(0.05, 0.06, 0.18, new THREE.MeshStandardMaterial({color:'#cfa84a',roughness:.4,metalness:.5}), x+0.05, 0.38 * shelf + 0.27, 0.04));
+            } else {
+              group.add(mkSphere(0.08, 0.07, 0.08, new THREE.MeshStandardMaterial({color:'#5a8a5a',roughness:.7}), x+0.08, 0.38 * shelf + 0.27, 0.04));
+            }
+            x += 0.13;
+          }
         }
       }
+      // Plante en haut
+      const pot = mkCyl(0.10, 0.08, 0.15, new THREE.MeshStandardMaterial({color:'#3a2a1a'}), 0.3, 1.97, 0);
+      group.add(pot);
+      const leaves = new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 8), green);
+      leaves.position.set(0.3, 2.10, 0); leaves.scale.y = 1.2; leaves.castShadow = true;
+      group.add(leaves);
+      // Photo cadre
+      group.add(rmk(0.18, 0.22, 0.02, woodDark, -0.3, 1.98, 0.05, 0.005));
+      group.add(rmk(0.14, 0.18, 0.005, new THREE.MeshStandardMaterial({color:'#cfd6e0'}), -0.3, 1.98, 0.07, 0.002));
       break;
+    }
 
     case 'plant': {
       // pot
