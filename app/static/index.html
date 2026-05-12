@@ -288,6 +288,12 @@ canvas{display:block}
       <button class="furniture-btn" onclick="addFurniture('dishwasher')">🧽 Lave-vaisselle</button>
       <button class="furniture-btn" onclick="addFurniture('curtain')">🪟 Rideaux</button>
       <button class="furniture-btn" onclick="addFurniture('ceiling_lamp')">💡 Plafonnier</button>
+      <button class="furniture-btn" onclick="addFurniture('single_bed')">🛌 Lit simple</button>
+      <button class="furniture-btn" onclick="addFurniture('crib')">👶 Berceau</button>
+      <button class="furniture-btn" onclick="addFurniture('vanity')">💄 Coiffeuse</button>
+      <button class="furniture-btn" onclick="addFurniture('toy_chest')">🧸 Coffre jouets</button>
+      <button class="furniture-btn" onclick="addFurniture('armchair')">🛋️ Fauteuil</button>
+      <button class="furniture-btn" onclick="addFurniture('shower')">🚿 Douche</button>
     </div>
     <div style="font-size:10px;color:var(--t2);margin-top:6px;line-height:1.4">💡 Cliquez-glissez un meuble en mode Orbite pour le déplacer.</div>
     <button class="btn btn-danger btn-xs" onclick="clearFurniture()" style="margin-top:6px;width:100%">🗑️ Tout supprimer</button>
@@ -990,30 +996,41 @@ window.startCinematicTour = function() {
     const lookHeight = 1.30;
     const name = r.name || `Pièce ${i+1}`;
 
-    // Plan 1 : depuis le coin "haut-gauche" (entrée typique), vue diagonale vers coin opposé
+    // Plan 1 : entrée diagonale (vue 3/4 sur la pièce entière)
     waypoints.push({
       pos: new THREE.Vector3(r.x + margin, eyeHeight, r.z + margin),
       look: new THREE.Vector3(r.x + r.width - margin, lookHeight, r.z + r.depth - margin),
-      dur: 3500,
+      dur: 3200,
       label: name,
       labelSub: `${r.width.toFixed(1)}×${r.depth.toFixed(1)} m`,
     });
-    // Plan 2 : depuis le coin opposé, vue retour
+    // Plan 2 : transition vers le centre
+    waypoints.push({
+      pos: new THREE.Vector3(cx, eyeHeight, cz),
+      look: new THREE.Vector3(r.x + r.width - margin, lookHeight, r.z + r.depth - margin),
+      dur: 1500,
+    });
+    // Plans 3-8 : ROTATION 360° depuis le centre de la pièce (6 angles)
+    // → on voit successivement les 4 murs + diagonales
+    const lookRadius = Math.max(r.width, r.depth) * 0.6;
+    const steps = 6;
+    for (let s = 0; s < steps; s++) {
+      const angle = (Math.PI * 2 * s) / steps;
+      waypoints.push({
+        pos: new THREE.Vector3(cx, eyeHeight, cz),
+        look: new THREE.Vector3(
+          cx + Math.cos(angle) * lookRadius,
+          lookHeight,
+          cz + Math.sin(angle) * lookRadius
+        ),
+        dur: 1400,
+      });
+    }
+    // Plan final : recul vers le coin opposé (vue d'ensemble retour)
     waypoints.push({
       pos: new THREE.Vector3(r.x + r.width - margin, eyeHeight, r.z + r.depth - margin),
       look: new THREE.Vector3(r.x + margin, lookHeight, r.z + margin),
-      dur: 3500,
-    });
-    // Plan 3 : balayage panoramique depuis le centre
-    waypoints.push({
-      pos: new THREE.Vector3(cx, eyeHeight, cz),
-      look: new THREE.Vector3(cx + r.width * 0.4, lookHeight, cz - r.depth * 0.4),
-      dur: 2500,
-    });
-    waypoints.push({
-      pos: new THREE.Vector3(cx, eyeHeight, cz),
-      look: new THREE.Vector3(cx - r.width * 0.4, lookHeight, cz + r.depth * 0.4),
-      dur: 2500,
+      dur: 2800,
     });
   });
 
@@ -1490,6 +1507,8 @@ const FURN_DIM = {
   painting:{w:0.8,d:0.06},
   oven:{w:0.6,d:0.6}, microwave:{w:0.5,d:0.4}, dishwasher:{w:0.6,d:0.6},
   curtain:{w:1.4,d:0.1}, ceiling_lamp:{w:0.5,d:0.5},
+  single_bed:{w:1.0,d:2.0}, crib:{w:1.3,d:0.7}, vanity:{w:1.1,d:0.5},
+  toy_chest:{w:0.9,d:0.5}, armchair:{w:0.9,d:0.85}, shower:{w:0.9,d:0.9},
 };
 
 // Placer un meuble contre un mur ('N'/'S'/'E'/'W') à une fraction t le long du mur (0..1).
@@ -1544,6 +1563,20 @@ function placeAtCenter(room, type, offsetX = 0, offsetZ = 0, rot = 0) {
 }
 
 function autoPlaceFurniture(rooms) {
+  // Pré-classement des chambres : la plus grande = principale, la plus petite = enfant
+  const bedroomIndices = rooms
+    .map((r, i) => ({ r, i, area: r.width * r.depth }))
+    .filter(o => {
+      const t = (o.r.type || '').toLowerCase();
+      const n = (o.r.name || '').toLowerCase();
+      return t === 'bedroom' || /chambre|bedroom|chamb/.test(n);
+    })
+    .sort((a, b) => b.area - a.area);
+  const bedroomRank = {
+    master: bedroomIndices[0]?.i,
+    child: bedroomIndices.length >= 2 ? bedroomIndices[bedroomIndices.length - 1].i : undefined,
+  };
+
   rooms.forEach((room, idx) => {
     const area = room.width * room.depth;
     const type = (room.type || '').toLowerCase();
@@ -1571,26 +1604,92 @@ function autoPlaceFurniture(rooms) {
 
     try {
       if (isBedroom) {
-        tryPlace(room, oppWall, 'bed', 0.5);
-        if (Math.min(room.width, room.depth) > 2.2) {
+        // Détermine le SOUS-TYPE de chambre pour varier l'ameublement
+        const isMaster = /principal|parent|master|suite/.test(name) ||
+          // Sinon : la plus grande chambre est désignée comme principale
+          (bedroomRank?.master === idx);
+        const isChild = /enfant|bebe|bébé|child|kid|baby|nursery/.test(name) ||
+          (bedroomRank?.child === idx);
+        const isBaby = /bebe|bébé|baby|nursery/.test(name);
+        const isGuest = /amis|invit|guest/.test(name);
+
+        if (isBaby) {
+          // CHAMBRE BÉBÉ : berceau + commode à langer + petit fauteuil
+          tryPlace(room, oppWall, 'crib', 0.5);
+          tryPlace(room, longSideWall, 'dresser', 0.5);
+          if (area > 8) tryPlace(room, perpWall, 'armchair', 0.5);
+          tryPlace(room, perpWall2, 'toy_chest', 0.5);
+          if (area > 7) placeAtCenter(room, 'rug', 0, 0, 0);
+          tryPlace(room, oppWall, 'painting', 0.5);
+        } else if (isChild) {
+          // CHAMBRE ENFANT : lit simple + bureau + coffre à jouets + étagère
+          tryPlace(room, oppWall, 'single_bed', 0.5);
+          if (Math.min(room.width, room.depth) > 2.0) {
+            tryPlace(room, oppWall, 'nightstand', 0.15);
+          }
+          tryPlace(room, longSideWall, 'wardrobe', 0.3);
+          tryPlace(room, longSideWall, 'toy_chest', 0.8);
+          if (area > 9) {
+            tryPlace(room, perpWall, 'desk', 0.5);
+            const dim = FURN_DIM.desk;
+            if (perpWall === 'W') placeFurniture('chair', room.x + dim.d + 0.75, 0, room.z + clamp(0.5*room.depth, 0.5, room.depth-0.5), -Math.PI/2);
+            else placeFurniture('chair', room.x + clamp(0.5*room.width, 0.5, room.width-0.5), 0, room.z + dim.d + 0.75, 0);
+          }
+          tryPlace(room, perpWall2, 'bookshelf', 0.5);
+          placeAtCenter(room, 'rug', 0, 0.4, 0);
+          tryPlace(room, oppWall, 'painting', 0.5);
+        } else if (isMaster) {
+          // CHAMBRE PRINCIPALE : lit double + 2 chevets + coiffeuse + fauteuil + armoire + commode
+          tryPlace(room, oppWall, 'bed', 0.5);
           tryPlace(room, oppWall, 'nightstand', 0.15);
           tryPlace(room, oppWall, 'nightstand', 0.85);
+          tryPlace(room, longSideWall, 'wardrobe', 0.22);
+          tryPlace(room, longSideWall, 'dresser', 0.78);
+          // Coiffeuse sur mur perpendiculaire
+          tryPlace(room, perpWall, 'vanity', 0.5);
+          // Fauteuil dans le coin
+          if (area > 14) {
+            const cf = createFurnitureMesh('armchair');
+            cf.position.set(room.x + room.width - 0.6, 0, room.z + room.depth - 0.6);
+            cf.rotation.y = -3 * Math.PI / 4;
+            state.furnitureGroup.add(cf);
+            state.furnitureItems.push({ type: 'armchair', mesh: cf });
+          }
+          tryPlace(room, perpWall2, 'mirror', 0.5);
+          placeAtCenter(room, 'rug', 0, 0.4, 0);
+          tryPlace(room, oppWall, 'painting', 0.3);
+          tryPlace(room, oppWall, 'painting', 0.7);
+          tryPlace(room, perpWall, 'plant', 0.95);
+        } else if (isGuest) {
+          // CHAMBRE D'AMIS : lit double + chevet unique + armoire + fauteuil
+          tryPlace(room, oppWall, 'bed', 0.5);
+          tryPlace(room, oppWall, 'nightstand', 0.15);
+          tryPlace(room, longSideWall, 'wardrobe', 0.5);
+          if (area > 10) tryPlace(room, perpWall, 'armchair', 0.6);
+          tryPlace(room, perpWall2, 'mirror', 0.5);
+          tryPlace(room, oppWall, 'painting', 0.5);
+        } else {
+          // CHAMBRE STANDARD
+          tryPlace(room, oppWall, 'bed', 0.5);
+          if (Math.min(room.width, room.depth) > 2.2) {
+            tryPlace(room, oppWall, 'nightstand', 0.15);
+            tryPlace(room, oppWall, 'nightstand', 0.85);
+          }
+          tryPlace(room, longSideWall, 'wardrobe', 0.25);
+          if (area > 8) tryPlace(room, longSideWall, 'dresser', 0.78);
+          if (area > 10) {
+            tryPlace(room, perpWall, 'desk', 0.5);
+            const dim = FURN_DIM.desk;
+            if (perpWall === 'W') placeFurniture('chair', room.x + dim.d + 0.75, 0, room.z + clamp(0.5*room.depth, 0.5, room.depth-0.5), -Math.PI/2);
+            else placeFurniture('chair', room.x + clamp(0.5*room.width, 0.5, room.width-0.5), 0, room.z + dim.d + 0.75, 0);
+          }
+          tryPlace(room, perpWall2, 'mirror', 0.5);
+          if (area > 8) placeAtCenter(room, 'rug', 0, 0.4, 0);
+          tryPlace(room, oppWall, 'painting', 0.3);
+          tryPlace(room, oppWall, 'painting', 0.7);
+          if (area > 9) tryPlace(room, perpWall, 'painting', 0.85);
+          if (area > 7) tryPlace(room, perpWall, 'plant', 0.95);
         }
-        tryPlace(room, longSideWall, 'wardrobe', 0.25);
-        if (area > 8) tryPlace(room, longSideWall, 'dresser', 0.78);
-        if (area > 10) {
-          tryPlace(room, perpWall, 'desk', 0.5);
-          const dim = FURN_DIM.desk;
-          if (perpWall === 'W') placeFurniture('chair', room.x + dim.d + 0.75, 0, room.z + clamp(0.5*room.depth, 0.5, room.depth-0.5), -Math.PI/2);
-          else placeFurniture('chair', room.x + clamp(0.5*room.width, 0.5, room.width-0.5), 0, room.z + dim.d + 0.75, 0);
-        }
-        tryPlace(room, perpWall2, 'mirror', 0.5);
-        if (area > 8) placeAtCenter(room, 'rug', 0, 0.4, 0);
-        // Tableaux au-dessus du lit + sur mur perp
-        tryPlace(room, oppWall, 'painting', 0.3);
-        tryPlace(room, oppWall, 'painting', 0.7);
-        if (area > 9) tryPlace(room, perpWall, 'painting', 0.85);
-        if (area > 7) tryPlace(room, perpWall, 'plant', 0.95);
       } else if (isLiving) {
         tryPlace(room, oppWall, 'sofa', 0.5);
         tryPlace(room, longSideWall, 'tv', 0.5);
@@ -2061,6 +2160,128 @@ function createFurnitureMesh(type) {
       const paintColors = ['#3a5da0','#8a4a3a','#4a8a3a','#a08030','#6a4090','#bf5d3f','#5e7d9a'];
       const pc = new THREE.MeshStandardMaterial({color: paintColors[Math.floor(Math.random()*paintColors.length)], roughness:.7});
       group.add(mk(0.75, 0.55, 0.02, pc, 0, 1.55, 0.025));
+      break;
+    }
+
+    case 'single_bed': {
+      // Lit simple 100×200 cm
+      group.add(rmk(1.05, 0.18, 2.05, wood, 0, 0.13, 0, 0.025));
+      group.add(rmk(1.0, 0.22, 2.0, white, 0, 0.33, 0, 0.04));
+      // drap couleur (couette enfant)
+      const kidColors = ['#5fb8d6','#f0a45a','#a8e063','#f06292'];
+      const ccol = new THREE.MeshStandardMaterial({ color: kidColors[Math.floor(Math.random()*4)], roughness: .85 });
+      group.add(rmk(1.0, 0.06, 1.4, ccol, 0, 0.47, 0.3, 0.02));
+      group.add(rmk(0.4, 0.1, 0.32, white, 0, 0.49, -0.75, 0.04));
+      // tête de lit basse
+      group.add(rmk(1.1, 0.6, 0.08, woodDark, 0, 0.45, -1.05, 0.03));
+      break;
+    }
+
+    case 'crib': {
+      // Lit bébé 130×70 cm
+      group.add(rmk(1.3, 0.06, 0.7, woodDark, 0, 0.5, 0, 0.015));  // base
+      group.add(rmk(1.3, 0.15, 0.7, white, 0, 0.59, 0, 0.04));     // matelas
+      // 2 oreillers + peluche
+      group.add(rmk(0.3, 0.04, 0.2, white, 0, 0.66, -0.2, 0.02));
+      // barreaux périphériques
+      const barreau = new THREE.MeshStandardMaterial({ color: '#cfa56a', roughness: 0.6 });
+      for (let i = -6; i <= 6; i++) {
+        group.add(mkCyl(0.015, 0.015, 0.6, barreau, i * 0.1, 0.85, -0.32));
+        group.add(mkCyl(0.015, 0.015, 0.6, barreau, i * 0.1, 0.85, 0.32));
+      }
+      // côtés
+      for (let i = -3; i <= 3; i++) {
+        group.add(mkCyl(0.015, 0.015, 0.6, barreau, -0.64, 0.85, i * 0.1));
+        group.add(mkCyl(0.015, 0.015, 0.6, barreau, 0.64, 0.85, i * 0.1));
+      }
+      // rails supérieurs
+      group.add(mk(1.3, 0.04, 0.04, barreau, 0, 1.13, -0.32));
+      group.add(mk(1.3, 0.04, 0.04, barreau, 0, 1.13, 0.32));
+      group.add(mk(0.04, 0.04, 0.7, barreau, -0.64, 1.13, 0));
+      group.add(mk(0.04, 0.04, 0.7, barreau, 0.64, 1.13, 0));
+      // peluche
+      group.add(mkSphere(0.08, 0.08, 0.08, new THREE.MeshStandardMaterial({color:'#cfa84a'}), 0.4, 0.71, 0.1));
+      break;
+    }
+
+    case 'vanity': {
+      // Coiffeuse 110×50 cm avec miroir rond
+      group.add(rmk(1.1, 0.6, 0.5, woodDark, 0, 0.3, 0, 0.02));
+      group.add(rmk(1.12, 0.04, 0.52, wood, 0, 0.62, 0, 0.01));
+      // 3 tiroirs avec poignées
+      for (let i = -1; i <= 1; i++) {
+        group.add(mk(0.32, 0.18, 0.02, woodDark, i * 0.36, 0.5, 0.26));
+        group.add(mkCyl(0.015, 0.015, 0.06, metal, i * 0.36, 0.5, 0.28));
+      }
+      // pieds
+      [-0.5, 0.5].forEach(x => [-0.2, 0.2].forEach(z => {
+        group.add(mk(0.04, 0.05, 0.04, dark, x, 0.025, z));
+      }));
+      // Miroir rond fixé sur le mur derrière la coiffeuse
+      const mirGeom = new THREE.RingGeometry(0.25, 0.32, 32);
+      const frame = new THREE.Mesh(mirGeom, woodDark);
+      frame.position.set(0, 1.35, -0.22);
+      group.add(frame);
+      const glass = new THREE.Mesh(new THREE.CircleGeometry(0.25, 32), new THREE.MeshStandardMaterial({color:'#cce0e8',roughness:.05,metalness:.5}));
+      glass.position.set(0, 1.35, -0.21);
+      group.add(glass);
+      // Accessoires : flacons
+      group.add(mkCyl(0.025, 0.025, 0.10, new THREE.MeshStandardMaterial({color:'#d68aa4'}), -0.3, 0.69, -0.1));
+      group.add(mkCyl(0.025, 0.025, 0.13, new THREE.MeshStandardMaterial({color:'#a5c3e6'}), -0.15, 0.71, -0.1));
+      group.add(mkCyl(0.02, 0.02, 0.08, new THREE.MeshStandardMaterial({color:'#f0bb47'}), 0.05, 0.68, -0.12));
+      // Tabouret devant
+      group.add(rmk(0.4, 0.04, 0.4, woodDark, 0, 0.5, 0.5, 0.02));
+      [-0.16, 0.16].forEach(x => [-0.16, 0.16].forEach(z => {
+        group.add(mk(0.03, 0.48, 0.03, woodDark, x, 0.25, 0.5 + z));
+      }));
+      group.add(rmk(0.36, 0.04, 0.36, fabricLight, 0, 0.525, 0.5, 0.018));
+      break;
+    }
+
+    case 'toy_chest': {
+      // Coffre à jouets coloré
+      const cMat = new THREE.MeshStandardMaterial({ color: '#5fb8d6', roughness: 0.6 });
+      group.add(rmk(0.9, 0.4, 0.5, cMat, 0, 0.2, 0, 0.04));
+      // couvercle légèrement incliné (ouvert)
+      const lid = rmk(0.92, 0.04, 0.52, cMat, 0, 0.43, -0.06, 0.02);
+      lid.rotation.x = -0.15;
+      group.add(lid);
+      // poignée
+      group.add(mkCyl(0.02, 0.02, 0.12, metal, 0, 0.41, 0.24));
+      // jouets visibles : ballon + cube
+      group.add(mkSphere(0.09, 0.09, 0.09, new THREE.MeshStandardMaterial({color:'#f0a45a'}), -0.2, 0.45, 0));
+      group.add(rmk(0.14, 0.14, 0.14, new THREE.MeshStandardMaterial({color:'#e8443a'}), 0.15, 0.47, -0.1, 0.015));
+      group.add(rmk(0.12, 0.12, 0.12, new THREE.MeshStandardMaterial({color:'#f0d040'}), 0.3, 0.46, 0.1, 0.012));
+      break;
+    }
+
+    case 'armchair': {
+      // Fauteuil simple
+      group.add(rmk(0.9, 0.4, 0.85, fabric, 0, 0.25, 0, 0.06));      // base
+      group.add(rmk(0.9, 0.55, 0.2, fabric, 0, 0.72, -0.32, 0.06));  // dossier
+      group.add(rmk(0.18, 0.4, 0.85, fabric, -0.36, 0.4, 0, 0.05));  // accoudoir G
+      group.add(rmk(0.18, 0.4, 0.85, fabric, 0.36, 0.4, 0, 0.05));   // accoudoir D
+      group.add(rmk(0.55, 0.14, 0.6, fabricLight, 0, 0.49, 0.05, 0.06));   // coussin
+      group.add(rmk(0.25, 0.25, 0.08, new THREE.MeshStandardMaterial({color:'#c47a3a'}), 0, 0.6, -0.22, 0.04));
+      [-0.32, 0.32].forEach(x => [-0.35, 0.35].forEach(z => {
+        group.add(mk(0.05, 0.05, 0.05, dark, x, 0.025, z));
+      }));
+      break;
+    }
+
+    case 'shower': {
+      // Douche 90×90 avec parois vitrées
+      // bac
+      group.add(rmk(0.9, 0.08, 0.9, porcelain, 0, 0.04, 0, 0.02));
+      // 2 parois vitrées (L)
+      const glass = new THREE.MeshStandardMaterial({color:'#cfe4ee',transparent:true,opacity:.35,roughness:.05,metalness:.1});
+      group.add(mk(0.04, 2.0, 0.9, glass, -0.45, 1.04, 0));
+      group.add(mk(0.9, 2.0, 0.04, glass, 0, 1.04, -0.45));
+      // porte vitrée frontale
+      group.add(mk(0.9, 2.0, 0.04, glass, 0, 1.04, 0.45));
+      // pommeau de douche au plafond
+      group.add(mkCyl(0.08, 0.10, 0.04, metal, -0.25, 2.0, -0.25));
+      group.add(mkCyl(0.02, 0.02, 0.3, metal, -0.25, 1.85, -0.25));
       break;
     }
 
