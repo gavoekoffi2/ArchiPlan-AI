@@ -262,6 +262,11 @@ canvas{display:block}
       <button class="furniture-btn" onclick="addFurniture('dresser')">🗄️ Commode</button>
       <button class="furniture-btn" onclick="addFurniture('mirror')">🪞 Miroir</button>
       <button class="furniture-btn" onclick="addFurniture('painting')">🖼️ Tableau</button>
+      <button class="furniture-btn" onclick="addFurniture('oven')">🔥 Four</button>
+      <button class="furniture-btn" onclick="addFurniture('microwave')">📡 Micro-ondes</button>
+      <button class="furniture-btn" onclick="addFurniture('dishwasher')">🧽 Lave-vaisselle</button>
+      <button class="furniture-btn" onclick="addFurniture('curtain')">🪟 Rideaux</button>
+      <button class="furniture-btn" onclick="addFurniture('ceiling_lamp')">💡 Plafonnier</button>
     </div>
     <div style="font-size:10px;color:var(--t2);margin-top:6px;line-height:1.4">💡 Cliquez-glissez un meuble en mode Orbite pour le déplacer.</div>
     <button class="btn btn-danger btn-xs" onclick="clearFurniture()" style="margin-top:6px;width:100%">🗑️ Tout supprimer</button>
@@ -1106,21 +1111,14 @@ function buildScene(data) {
   state.floorMesh.receiveShadow = true;
   state.modelGroup.add(state.floorMesh);
 
-  // Sols colorés par pièce (opaques, BoxGeometry très fine pour éviter z-fighting)
+  // Étiquettes flottantes des pièces (PLUS de sol coloré, on évite tout z-fight)
+  // Le parquet général sert de sol, les pièces sont identifiées par sprite et meubles.
   (data.rooms || []).forEach((room, i) => {
     const rw = room.width || 3, rd = room.depth || 3;
-    const g = new THREE.BoxGeometry(rw - 0.18, 0.02, rd - 0.18);
     const color = room.color || COLORS[i % COLORS.length];
-    const m = new THREE.MeshStandardMaterial({ color, roughness: 0.85, metalness: 0 });
-    const mesh = new THREE.Mesh(g, m);
-    mesh.position.set(room.x + rw/2, 0.025, room.z + rd/2);
-    mesh.receiveShadow = true;
-    mesh.userData = { room, idx: i };
-    state.roomsGroup.add(mesh);
-    // Étiquette flottante de la pièce
     const label = makeTextSprite(room.name || `Pièce ${i+1}`, color);
-    label.position.set(room.x + rw/2, 1.6, room.z + rd/2);
-    label.userData = { isLabel: true };
+    label.position.set(room.x + rw/2, 1.8, room.z + rd/2);
+    label.userData = { isLabel: true, room, idx: i };
     state.roomsGroup.add(label);
   });
 
@@ -1153,22 +1151,55 @@ function buildScene(data) {
     state.doorsGroup.add(mesh);
   });
 
-  // Windows
+  // Windows + cadres + rideaux
   (data.windows || []).forEach(w => {
     const ww = w.width || 1.2, wh = w.height || 1.2;
+    const wy = w.y || 1.2;
+    // Vitrage
     const g = new THREE.BoxGeometry(thick * 0.8, wh - 0.1, ww - 0.1);
     const m = new THREE.MeshStandardMaterial({
       color: '#c8e8ff', roughness: 0.05, emissive: '#112244',
-      emissiveIntensity: 0.25, opacity: 0.6, transparent: true,
+      emissiveIntensity: 0.25, opacity: 0.55, transparent: true,
     });
     const mesh = new THREE.Mesh(g, m);
-    mesh.position.set(w.x, w.y || 1.2, w.z);
+    mesh.position.set(w.x, wy, w.z);
     mesh.rotation.y = w.rotation || 0;
     state.windowsGroup.add(mesh);
+    // Cadre bois (4 segments minces autour)
+    const frameMat = new THREE.MeshStandardMaterial({ color: '#cfc7b8', roughness: 0.7 });
+    const frame = new THREE.Group();
+    const f = 0.08;
+    frame.add(new THREE.Mesh(new THREE.BoxGeometry(thick * 1.1, f, ww), frameMat).translateY(wh/2));
+    frame.add(new THREE.Mesh(new THREE.BoxGeometry(thick * 1.1, f, ww), frameMat).translateY(-wh/2));
+    frame.add(new THREE.Mesh(new THREE.BoxGeometry(thick * 1.1, wh, f), frameMat).translateZ(ww/2 - f/2));
+    frame.add(new THREE.Mesh(new THREE.BoxGeometry(thick * 1.1, wh, f), frameMat).translateZ(-ww/2 + f/2));
+    frame.position.set(w.x, wy, w.z);
+    frame.rotation.y = w.rotation || 0;
+    state.windowsGroup.add(frame);
+    // Rideau accroché juste devant la fenêtre (mêmes coords)
+    const curtain = createFurnitureMesh('curtain');
+    curtain.position.set(w.x, 0, w.z);
+    curtain.rotation.y = w.rotation || 0;
+    curtain.scale.set(ww / 1.4, wh / 1.6 * 1.05, 1);
+    state.windowsGroup.add(curtain);
   });
 
   // Auto furniture
   autoPlaceFurniture(data.rooms || []);
+
+  // Lampes plafond auto pour les pièces principales
+  (data.rooms || []).forEach(room => {
+    const t = (room.type || '').toLowerCase();
+    const n = (room.name || '').toLowerCase();
+    const area = room.width * room.depth;
+    const major = /living|salon|kitchen|cuisin|bedroom|chambre|dining|bureau/.test(t + ' ' + n);
+    if (!major && area < 7) return;
+    const lamp = createFurnitureMesh('ceiling_lamp');
+    // Origine du modèle = plafond, donc y = wall height
+    lamp.position.set(room.x + room.width/2, h, room.z + room.depth/2);
+    state.furnitureGroup.add(lamp);
+    state.furnitureItems.push({ type: 'ceiling_lamp', mesh: lamp });
+  });
 
   // Toit / plafond (caché par défaut)
   generateRoof(data, h, tw, td);
@@ -1203,28 +1234,32 @@ function computeModelBBox(data) {
 function fitLightsAndCameraToBBox(b) {
   const size = Math.max(b.w, b.d);
   // Caméra : centrée sur le centre du modèle, en hauteur, légèrement reculée
-  state.camera.position.set(b.cx, size * 0.85, b.maxZ + size * 0.4);
-  state.controls.target.set(b.cx, 0, b.cz);
-  state.controls.maxDistance = size * 4;
+  state.camera.position.set(b.cx, size * 0.85, b.maxZ + size * 0.5);
+  // Cible à mi-hauteur de mur pour ne jamais regarder droit dans le sol
+  state.controls.target.set(b.cx, 1.0, b.cz);
+  state.controls.maxDistance = size * 5;
   state.controls.minDistance = 0.5;
   state.controls.update();
 
   // Soleil : positionné au-dessus du centre, décalé pour ombres
-  state.sun.position.set(b.cx + size * 0.6, size * 1.5 + 5, b.cz - size * 0.4);
+  state.sun.position.set(b.cx + size * 0.5, size * 1.5 + 5, b.cz - size * 0.3);
   state.sun.target.position.set(b.cx, 0, b.cz);
   state.sun.target.updateMatrixWorld();
-  state.scene.add(state.sun.target);
+  // N'ajouter qu'une seule fois la target à la scène
+  if (!state._sunTargetAdded) {
+    state.scene.add(state.sun.target);
+    state._sunTargetAdded = true;
+  }
   // Frustum d'ombres adapté à la bbox
-  const pad = size * 0.7 + 5;
+  const pad = size * 0.8 + 8;
   state.sun.shadow.camera.left = -pad;
   state.sun.shadow.camera.right = pad;
   state.sun.shadow.camera.top = pad;
   state.sun.shadow.camera.bottom = -pad;
   state.sun.shadow.camera.near = 0.5;
-  state.sun.shadow.camera.far = size * 4 + 20;
+  state.sun.shadow.camera.far = size * 5 + 30;
+  state.sun.shadow.bias = -0.0008; // évite l'acné d'ombre
   state.sun.shadow.camera.updateProjectionMatrix();
-  // En décalant le soleil dans le repère monde, il faut le positionner relativement au modèle
-  state.sun.shadow.camera.position.copy(state.sun.position);
 }
 
 function generateWallsFromRooms(rooms, tw, td, h, thick) {
@@ -1341,6 +1376,8 @@ const FURN_DIM = {
   bathtub:{w:1.7,d:0.8}, toilet:{w:0.42,d:0.7}, bookshelf:{w:1.0,d:0.35},
   rug:{w:1.8,d:1.2}, dresser:{w:1.0,d:0.5}, mirror:{w:0.7,d:0.05},
   painting:{w:0.8,d:0.06},
+  oven:{w:0.6,d:0.6}, microwave:{w:0.5,d:0.4}, dishwasher:{w:0.6,d:0.6},
+  curtain:{w:1.4,d:0.1}, ceiling_lamp:{w:0.5,d:0.5},
 };
 
 // Placer un meuble contre un mur ('N'/'S'/'E'/'W') à une fraction t le long du mur (0..1).
@@ -1458,7 +1495,10 @@ function autoPlaceFurniture(rooms) {
       } else if (isKitchen) {
         tryPlace(room, longSideWall, 'kitchen', 0.5);
         tryPlace(room, longSideWall, 'fridge', 0.95);
+        tryPlace(room, longSideWall, 'oven', 0.05);
         tryPlace(room, perpWall, 'sink', 0.5);
+        if (area > 8) tryPlace(room, perpWall, 'dishwasher', 0.15);
+        if (area > 10) tryPlace(room, perpWall, 'microwave', 0.85);
         if (area > 12) {
           placeAtCenter(room, 'dining_table');
           placeAtCenter(room, 'chair', -0.9, 0, Math.PI/2);
@@ -1799,14 +1839,88 @@ function createFurnitureMesh(type) {
       group.add(mk(0.62, 1.12, 0.02, new THREE.MeshStandardMaterial({color:'#c8d8e8',roughness:.05,metalness:.4,emissive:'#101820',emissiveIntensity:.1}), 0, 1.4, 0.025));
       break;
 
-    case 'painting':
-      // Tableau au mur, 0.8×0.6m, posé à 1.5m
+    case 'painting': {
       group.add(mk(0.85, 0.65, 0.04, woodDark, 0, 1.55, 0));
-      // toile (couleur aléatoire pour variation)
-      const paintColors = ['#3a5da0','#8a4a3a','#4a8a3a','#a08030','#6a4090'];
-      const pc = new THREE.MeshStandardMaterial({color: paintColors[Math.floor(Math.random()*5)], roughness:.7});
+      const paintColors = ['#3a5da0','#8a4a3a','#4a8a3a','#a08030','#6a4090','#bf5d3f','#5e7d9a'];
+      const pc = new THREE.MeshStandardMaterial({color: paintColors[Math.floor(Math.random()*paintColors.length)], roughness:.7});
       group.add(mk(0.75, 0.55, 0.02, pc, 0, 1.55, 0.025));
       break;
+    }
+
+    case 'oven':
+      // four 60×60×60 cm
+      group.add(mk(0.58, 0.6, 0.58, dark, 0, 0.3, 0));
+      // porte vitrée
+      group.add(mk(0.5, 0.45, 0.02, new THREE.MeshStandardMaterial({color:'#1a1a20',roughness:.1,emissive:'#3a2a10',emissiveIntensity:.2}), 0, 0.3, 0.3));
+      // poignée
+      group.add(mkCyl(0.015, 0.015, 0.4, metal, 0, 0.55, 0.32));
+      // boutons
+      [-0.15, -0.05, 0.05, 0.15].forEach(x => {
+        const b = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.02, 12), metal);
+        b.position.set(x, 0.55, 0.3); b.rotation.x = Math.PI/2; group.add(b);
+      });
+      break;
+
+    case 'microwave':
+      group.add(mk(0.5, 0.32, 0.4, white, 0, 0.16, 0));
+      // porte vitrée
+      group.add(mk(0.36, 0.24, 0.02, new THREE.MeshStandardMaterial({color:'#1a1a20',roughness:.15,emissive:'#1a1a30',emissiveIntensity:.2}), -0.05, 0.16, 0.21));
+      // panneau de commande
+      group.add(mk(0.1, 0.24, 0.02, dark, 0.18, 0.16, 0.21));
+      // boutons
+      [-0.04, 0.04].forEach(y => [0.16, 0.21].forEach(z => {
+        const b = new THREE.Mesh(new THREE.SphereGeometry(0.008, 8, 6), metal);
+        b.position.set(0.18, 0.16+y, 0.22); group.add(b);
+      }));
+      break;
+
+    case 'dishwasher':
+      // 60×60×85
+      group.add(mk(0.58, 0.85, 0.58, white, 0, 0.425, 0));
+      // façade
+      group.add(mk(0.55, 0.78, 0.02, new THREE.MeshStandardMaterial({color:'#d0d8e0',roughness:.3,metalness:.4}), 0, 0.425, 0.3));
+      // poignée horizontale en haut
+      group.add(mkCyl(0.015, 0.015, 0.5, metal, 0, 0.78, 0.31));
+      break;
+
+    case 'curtain': {
+      // rideau au mur derrière une fenêtre
+      const curtMat = new THREE.MeshStandardMaterial({ color: '#c4b8a8', roughness: 0.95 });
+      // 2 panneaux qui se rejoignent au milieu
+      group.add(mk(0.55, 1.6, 0.08, curtMat, -0.4, 1.2, 0));
+      group.add(mk(0.55, 1.6, 0.08, curtMat, 0.4, 1.2, 0));
+      // tringle
+      group.add(mkCyl(0.02, 0.02, 1.4, metal, 0, 2.05, 0.05));
+      // plis (variations)
+      for (let i = -3; i < 4; i++) {
+        if (Math.abs(i) < 1) continue;
+        const x = i * 0.13;
+        const stripe = new THREE.Mesh(new THREE.PlaneGeometry(0.08, 1.55), new THREE.MeshStandardMaterial({color:'#a89c8c',roughness:.95,side:THREE.DoubleSide}));
+        stripe.position.set(x, 1.2, 0.05);
+        group.add(stripe);
+      }
+      break;
+    }
+
+    case 'ceiling_lamp': {
+      // Origine = point d'attache au plafond ; tout pend vers le bas.
+      // tige
+      group.add(mkCyl(0.01, 0.01, 0.5, dark, 0, -0.25, 0));
+      // abat-jour (cône pointe en haut)
+      const shade = new THREE.Mesh(
+        new THREE.ConeGeometry(0.22, 0.28, 24, 1, true),
+        new THREE.MeshStandardMaterial({ color:'#f0e8c8', emissive:'#ffeebb', emissiveIntensity:.6, side: THREE.DoubleSide, roughness:.7 })
+      );
+      shade.position.y = -0.6;
+      shade.castShadow = false;
+      group.add(shade);
+      // ampoule
+      const bulb = new THREE.PointLight('#ffd9a0', 0.5, 7, 2);
+      bulb.position.y = -0.7;
+      bulb.castShadow = false;
+      group.add(bulb);
+      break;
+    }
 
     default:
       // meuble inconnu : cube discret
