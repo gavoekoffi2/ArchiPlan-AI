@@ -895,6 +895,19 @@ async def add_no_cache_headers(request: Request, call_next):
         response.headers["Expires"] = "0"
     return response
 
+# Middleware : forcer no-cache sur les fichiers HTML pour que le navigateur
+# prenne TOUJOURS la dernière version après chaque déploiement.
+@app.middleware("http")
+async def no_cache_html(request: Request, call_next):
+    response = await call_next(request)
+    path = request.url.path
+    if path.endswith(".html") or path == "/" or path.endswith("/"):
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
+
+
 app.mount("/", StaticFiles(directory=str(STATIC), html=True), name="static")
 
 
