@@ -6,6 +6,7 @@ set -euo pipefail
 REPO_DIR="/root/archiplan3d"
 LOG_FILE="/root/archiplan3d/app/logs/deploy.log"
 PYTHON_BIN="${PYTHON_BIN:-}"
+VENV_DIR="${VENV_DIR:-$REPO_DIR/.venv}"
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
@@ -30,12 +31,18 @@ log "📥 git pull..."
 git pull origin master 2>&1 | tee -a "$LOG_FILE"
 
 # 2. Dépendances
+if [ ! -x "$VENV_DIR/bin/python" ]; then
+    log "🧰 Création du venv..."
+    "$PYTHON_BIN" -m venv "$VENV_DIR"
+fi
+APP_PYTHON="$VENV_DIR/bin/python"
+
 log "📦 pip install..."
-"$PYTHON_BIN" -m pip install -r requirements.txt -q 2>&1 | tee -a "$LOG_FILE"
+"$APP_PYTHON" -m pip install -r requirements.txt -q 2>&1 | tee -a "$LOG_FILE"
 
 # 3. Tests
 log "🧪 pytest..."
-if "$PYTHON_BIN" -m pytest tests/ -q 2>&1 | tee -a "$LOG_FILE"; then
+if "$APP_PYTHON" -m pytest tests/ -q 2>&1 | tee -a "$LOG_FILE"; then
     log "✅ Tests OK"
 else
     log "❌ Tests échoués — déploiement arrêté"
@@ -48,7 +55,7 @@ pkill -f "uvicorn .*9090" 2>/dev/null || true
 sleep 2
 
 cd "$REPO_DIR"
-nohup "$PYTHON_BIN" -m uvicorn app.main:app --host 0.0.0.0 --port 9090 > app/logs/uvicorn.log 2>&1 &
+nohup "$APP_PYTHON" -m uvicorn app.main:app --host 0.0.0.0 --port 9090 > app/logs/uvicorn.log 2>&1 &
 sleep 2
 
 # 5. Vérification
