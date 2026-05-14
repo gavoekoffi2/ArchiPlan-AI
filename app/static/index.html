@@ -164,6 +164,22 @@ body{font-family:Inter,Segoe UI,system-ui,sans-serif;background:var(--bg);color:
 .field-row{display:flex;gap:8px}
 .field-row .field{flex:1}
 
+@media (max-width: 760px) {
+  #header{left:8px;right:8px;top:8px;padding:8px 10px}
+  .logo{font-size:14px}
+  #toolbar{left:8px;top:auto;bottom:72px;transform:none;flex-direction:row;max-width:calc(100vw - 16px);overflow-x:auto;padding:6px}
+  .tool{width:34px;height:34px;flex:0 0 34px}
+  .tool-sep{width:1px;height:26px;margin:4px 2px}
+  #sidebar,#furniture-panel{left:8px!important;right:8px!important;top:auto!important;bottom:118px!important;width:auto!important;max-height:45vh}
+  #cmd-bar{left:8px;right:8px;bottom:58px;width:auto;transform:none}
+  #room-selector{left:8px;right:8px;bottom:14px;transform:none}
+  #room-select{width:100%}
+  #bottombar{right:8px;bottom:14px}
+  #stats{left:8px;right:8px;bottom:112px;overflow-x:auto}
+  .modal-inner{width:calc(100vw - 24px);max-height:86vh;padding:16px}
+  .field-row{flex-direction:column;gap:0}
+}
+
 ::-webkit-scrollbar{width:6px}
 ::-webkit-scrollbar-thumb{background:var(--b);border-radius:3px}
 ::-webkit-scrollbar-thumb:hover{background:var(--a)}
@@ -186,6 +202,8 @@ canvas{display:block}
   <div id="header">
     <div class="logo"><span class="logo-icon">A</span>ArchiPlan AI</div>
     <div style="display:flex;gap:4px">
+      <button class="btn btn-o btn-xs" onclick="openAuthModal()" title="Compte et projets">👤</button>
+      <button class="btn btn-o btn-xs" onclick="saveCurrentProject()" title="Sauvegarder le projet">💾</button>
       <button class="btn btn-o btn-xs" id="btn-theme" data-tooltip="Thème" onclick="toggleTheme()" title="Basculer thème">🌓</button>
       <button class="btn btn-o btn-xs" onclick="resetCamera()" title="Recadrer">🎯</button>
       <button class="btn btn-o btn-xs" onclick="toggleFullscreen()" title="Plein écran">⛶</button>
@@ -212,6 +230,9 @@ canvas{display:block}
     <button class="tool" data-tooltip="Toit / Plafond" id="tool-roof" onclick="toggleRoof()">🏠</button>
     <button class="tool" data-tooltip="Tour automatique" id="tool-tour" onclick="startCinematicTour()">🎬</button>
     <div class="tool-sep"></div>
+    <button class="tool" data-tooltip="Sauvegarder projet" onclick="saveCurrentProject()">💾</button>
+    <button class="tool" data-tooltip="Mes projets" onclick="openAuthModal()">🗂️</button>
+    <div class="tool-sep"></div>
     <button class="tool" data-tooltip="Export OBJ (Blender, SketchUp)" onclick="exportOBJ()">📦</button>
     <button class="tool" data-tooltip="Export glTF (web, Three.js)" onclick="exportGLTF()">📐</button>
     <button class="tool" data-tooltip="Export STL (3D-print, Revit, AutoCAD)" onclick="exportSTL()">🖨️</button>
@@ -220,6 +241,8 @@ canvas{display:block}
     <div class="tool-sep"></div>
     <button class="tool" data-tooltip="Coût construction" onclick="openCostModal()">💶</button>
     <button class="tool" data-tooltip="Modifier pièce" onclick="openEditModal()">✏️</button>
+    <button class="tool" data-tooltip="Annuler (Ctrl+Z)" onclick="undoChange()">↶</button>
+    <button class="tool" data-tooltip="Refaire (Ctrl+Y)" onclick="redoChange()">↷</button>
     <div class="tool-sep"></div>
     <button class="tool" data-tooltip="Réinitialiser" onclick="resetScene()">🔄</button>
   </div>
@@ -364,6 +387,27 @@ canvas{display:block}
   </div>
 </div>
 
+<!-- Modal compte et projets -->
+<div class="modal" id="auth-modal">
+  <div class="modal-inner">
+    <div class="modal-title">👤 Compte et projets <button class="modal-close" onclick="closeModal('auth-modal')">×</button></div>
+    <div id="auth-status" style="font-size:12px;color:var(--t2);margin-bottom:10px">Non connecté</div>
+    <div class="field"><label>Email</label><input type="email" id="auth-email" autocomplete="email"></div>
+    <div class="field"><label>Mot de passe</label><input type="password" id="auth-password" autocomplete="current-password"></div>
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <button class="btn btn-g" onclick="loginUser()" style="flex:1">Connexion</button>
+      <button class="btn btn-o btn-g" onclick="registerUser()" style="flex:1">Créer compte</button>
+      <button class="btn btn-o btn-g" onclick="logoutUser()">Sortir</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <button class="btn btn-g" onclick="saveCurrentProject()" style="flex:1">💾 Sauvegarder ce projet</button>
+      <button class="btn btn-o btn-g" onclick="loadProjects()" style="flex:1">Rafraîchir</button>
+    </div>
+    <div class="sidebar-title">Mes projets</div>
+    <div id="projects-list" style="display:grid;gap:6px;font-size:12px"></div>
+  </div>
+</div>
+
 <div class="modal" id="edit-modal">
   <div class="modal-inner">
     <div class="modal-title">✏️ Modifier une pièce <button class="modal-close" onclick="closeModal('edit-modal')">×</button></div>
@@ -412,6 +456,10 @@ const state = {
   sun: null, ambient: null, hemi: null,
   minimapCtx: null,
   textures: {},
+  currentUser: null,
+  currentProjectId: null,
+  undoStack: [],
+  redoStack: [],
 };
 
 const COLORS = ['#f4a460','#7ec850','#68a0d8','#c080d0','#50c8b8','#e8a040','#60b880','#5890d0','#b870c8','#48b8a8'];
@@ -431,6 +479,202 @@ window.toggleTheme = () => {
   applyTheme(cur === 'dark' ? 'light' : 'dark');
 };
 applyTheme(localStorage.getItem('archiplan-theme') || 'dark');
+
+async function apiJSON(url, options = {}) {
+  const r = await fetch(url, {
+    credentials: 'same-origin',
+    ...options,
+    headers: {
+      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(options.headers || {}),
+    },
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.detail || `Erreur ${r.status}`);
+  return data;
+}
+
+function updateAuthUI() {
+  const el = document.getElementById('auth-status');
+  if (!el) return;
+  el.textContent = state.currentUser
+    ? `Connecté : ${state.currentUser.email}`
+    : 'Non connecté';
+}
+
+async function refreshCurrentUser() {
+  try {
+    const data = await apiJSON('/api/auth/me');
+    state.currentUser = data.user;
+  } catch {
+    state.currentUser = null;
+  }
+  updateAuthUI();
+}
+
+function cloneModelData(model = state.modelData) {
+  return model ? JSON.parse(JSON.stringify(model)) : null;
+}
+
+function clearHistory() {
+  state.undoStack = [];
+  state.redoStack = [];
+}
+
+function pushHistory(label = 'Modification') {
+  const snapshot = cloneModelData();
+  if (!snapshot) return;
+  state.undoStack.push({ label, model: snapshot, analysis: state._lastAnalysis ? JSON.parse(JSON.stringify(state._lastAnalysis)) : null });
+  if (state.undoStack.length > 40) state.undoStack.shift();
+  state.redoStack = [];
+}
+
+function restoreSnapshot(entry, targetStack, label) {
+  if (!entry?.model) return toast('Aucun historique disponible', 'error');
+  targetStack.push({ label, model: cloneModelData(), analysis: state._lastAnalysis ? JSON.parse(JSON.stringify(state._lastAnalysis)) : null });
+  state.modelData = cloneModelData(entry.model);
+  state._lastAnalysis = entry.analysis ? JSON.parse(JSON.stringify(entry.analysis)) : null;
+  buildScene(state.modelData);
+  showUI();
+  toast(label, 'success');
+}
+
+window.undoChange = function() {
+  const entry = state.undoStack.pop();
+  restoreSnapshot(entry, state.redoStack, 'Modification annulée');
+};
+
+window.redoChange = function() {
+  const entry = state.redoStack.pop();
+  restoreSnapshot(entry, state.undoStack, 'Modification rétablie');
+};
+
+window.openAuthModal = async function() {
+  document.getElementById('auth-modal').classList.add('show');
+  try {
+    const data = await apiJSON('/api/auth/me');
+    state.currentUser = data.user;
+    updateAuthUI();
+    await loadProjects();
+  } catch {
+    state.currentUser = null;
+    updateAuthUI();
+    document.getElementById('projects-list').innerHTML =
+      '<div style="color:var(--t2)">Connectez-vous pour sauvegarder et retrouver vos projets.</div>';
+  }
+};
+
+window.registerUser = async function() {
+  const email = document.getElementById('auth-email').value.trim();
+  const password = document.getElementById('auth-password').value;
+  try {
+    const data = await apiJSON('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    });
+    state.currentUser = data.user;
+    updateAuthUI();
+    toast('Compte créé', 'success');
+    await loadProjects();
+  } catch (e) { toast(e.message, 'error'); }
+};
+
+window.loginUser = async function() {
+  const email = document.getElementById('auth-email').value.trim();
+  const password = document.getElementById('auth-password').value;
+  try {
+    const data = await apiJSON('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    });
+    state.currentUser = data.user;
+    updateAuthUI();
+    toast('Connexion réussie', 'success');
+    await loadProjects();
+  } catch (e) { toast(e.message, 'error'); }
+};
+
+window.logoutUser = async function() {
+  try { await apiJSON('/api/auth/logout', { method: 'POST' }); } catch {}
+  state.currentUser = null;
+  state.currentProjectId = null;
+  updateAuthUI();
+  document.getElementById('projects-list').innerHTML = '';
+  toast('Session fermée', 'success');
+};
+
+window.loadProjects = async function() {
+  const box = document.getElementById('projects-list');
+  box.innerHTML = '<div style="color:var(--t2)">Chargement...</div>';
+  try {
+    const data = await apiJSON('/api/projects');
+    if (!data.projects.length) {
+      box.innerHTML = '<div style="color:var(--t2)">Aucun projet sauvegardé.</div>';
+      return;
+    }
+    box.innerHTML = '';
+    data.projects.forEach(p => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;gap:6px;align-items:center;justify-content:space-between;border:1px solid var(--b);border-radius:8px;padding:8px;background:var(--bg)';
+      row.innerHTML = `<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(p.name)}</span>
+        <span style="display:flex;gap:4px;flex-shrink:0">
+          <button class="btn btn-o btn-xs" data-open="${p.id}">Ouvrir</button>
+          <button class="btn btn-danger btn-xs" data-del="${p.id}">Suppr.</button>
+        </span>`;
+      row.querySelector('[data-open]').onclick = () => openProject(p.id);
+      row.querySelector('[data-del]').onclick = () => deleteProject(p.id);
+      box.appendChild(row);
+    });
+  } catch (e) { box.innerHTML = `<div style="color:#e74c3c">${escapeHtml(e.message)}</div>`; }
+};
+
+window.saveCurrentProject = async function() {
+  if (!state.modelData) return toast('Chargez un plan avant de sauvegarder', 'error');
+  if (!state.currentUser) {
+    document.getElementById('auth-modal').classList.add('show');
+    return toast('Connectez-vous avant de sauvegarder', 'error');
+  }
+  const name = prompt('Nom du projet', state.currentProjectId ? 'Projet ArchiPlan mis à jour' : 'Projet ArchiPlan');
+  if (name === null) return;
+  try {
+    const payload = {
+      name: name.trim() || 'Projet ArchiPlan',
+      analysis: state._lastAnalysis || null,
+      model: state.modelData,
+    };
+    const data = state.currentProjectId
+      ? await apiJSON(`/api/projects/${state.currentProjectId}`, { method: 'PUT', body: JSON.stringify(payload) })
+      : await apiJSON('/api/projects', { method: 'POST', body: JSON.stringify(payload) });
+    state.currentProjectId = data.project.id;
+    toast('Projet sauvegardé', 'success');
+    if (document.getElementById('auth-modal').classList.contains('show')) await loadProjects();
+  } catch (e) { toast(e.message, 'error'); }
+};
+
+window.openProject = async function(id) {
+  try {
+    const data = await apiJSON(`/api/projects/${id}`);
+    const p = data.project;
+    state.currentProjectId = p.id;
+    state._lastAnalysis = p.analysis || null;
+    state.fileId = `project_${p.id}`;
+    clearHistory();
+    buildScene(p.model);
+    showUI();
+    closeModal('auth-modal');
+    toast(`Projet ouvert : ${p.name}`, 'success');
+  } catch (e) { toast(e.message, 'error'); }
+};
+
+window.deleteProject = async function(id) {
+  if (!confirm('Supprimer ce projet ?')) return;
+  try {
+    await apiJSON(`/api/projects/${id}`, { method: 'DELETE' });
+    if (state.currentProjectId === id) state.currentProjectId = null;
+    await loadProjects();
+    toast('Projet supprimé', 'success');
+  } catch (e) { toast(e.message, 'error'); }
+};
 
 // ─── TEXTURES PROCÉDURALES ───
 function makeParquetTexture() {
@@ -520,7 +764,12 @@ function makeWallTexture() {
 // ─── INIT ───
 function initScene() {
   const isLight = document.documentElement.getAttribute('data-theme') === 'light';
-  state.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: true });
+  state.renderer = new THREE.WebGLRenderer({
+    antialias: false,
+    alpha: false,
+    preserveDrawingBuffer: true,
+    logarithmicDepthBuffer: true,
+  });
   state.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   state.renderer.setSize(window.innerWidth, window.innerHeight);
   state.renderer.shadowMap.enabled = true;
@@ -546,7 +795,7 @@ function initScene() {
   // Pas de fog par défaut — la maison doit rester visible à toute distance
   state.scene.fog = null;
 
-  state.camera = new THREE.PerspectiveCamera(55, window.innerWidth/window.innerHeight, 0.1, 500);
+  state.camera = new THREE.PerspectiveCamera(55, window.innerWidth/window.innerHeight, 0.05, 800);
   state.camera.position.set(8, 12, 14);
 
   state.controls = new OrbitControls(state.camera, state.renderer.domElement);
@@ -555,6 +804,7 @@ function initScene() {
   state.controls.target.set(5, 0, 4);
   state.controls.minDistance = 1.0;
   state.controls.maxDistance = 120;
+  state.controls.minPolarAngle = 0.1;
   state.controls.maxPolarAngle = Math.PI / 2.05; // un peu plus de liberté
 
   // Lights
@@ -1180,6 +1430,18 @@ function onMouseUp(e) {
 }
 
 function onKeyDown(e) {
+  const tag = document.activeElement?.tagName;
+  const isTyping = tag === 'INPUT' || tag === 'TEXTAREA' || document.activeElement?.isContentEditable;
+  if (!isTyping && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+    e.preventDefault();
+    undoChange();
+    return;
+  }
+  if (!isTyping && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+    e.preventDefault();
+    redoChange();
+    return;
+  }
   state.walkKeys[e.key.toLowerCase()] = true;
   if (e.key === 'Escape') {
     if (_tourActive) finishCinematicTour();
@@ -1200,14 +1462,24 @@ function onClick(e) {
 }
 
 // ─── BUILD SCENE ───
+function disposeObject3D(obj) {
+  obj.traverse?.(child => {
+    child.geometry?.dispose?.();
+    const mats = Array.isArray(child.material) ? child.material : [child.material];
+    mats.filter(Boolean).forEach(mat => {
+      // Ne pas disposer les textures globales parquet/mur : elles sont partagees entre reconstructions.
+      if (mat.map && mat.map !== state.textures.parquet && mat.map !== state.textures.wall) mat.map.dispose?.();
+      mat.dispose?.();
+    });
+  });
+}
+
 function buildScene(data) {
   [state.wallsGroup, state.roomsGroup, state.doorsGroup, state.windowsGroup, state.furnitureGroup, state.roofGroup].forEach(g => {
     while (g.children.length) {
       const c = g.children[0];
       g.remove(c);
-      c.geometry?.dispose?.();
-      c.material?.dispose?.();
-      c.material?.map?.dispose?.();
+      disposeObject3D(c);
     }
   });
   if (state.floorMesh) {
@@ -1253,7 +1525,7 @@ function buildScene(data) {
     const wx = Number(w.x), wz = Number(w.z);
     if (!isFinite(wx) || !isFinite(wz)) return;
     const g = new THREE.BoxGeometry(len, h, thick);
-    const mesh = new THREE.Mesh(g, wallMat.clone());
+    const mesh = new THREE.Mesh(g, wallMat);
     mesh.position.set(wx, h/2, wz);
     mesh.rotation.y = Number(w.rotation) || 0;
     mesh.castShadow = true; mesh.receiveShadow = true;
@@ -1406,7 +1678,7 @@ function generateWallsFromRooms(rooms, tw, td, h, thick) {
   ];
   perim.forEach(([mx, mz, len, rot]) => {
     const g = new THREE.BoxGeometry(len, h, thick);
-    const mesh = new THREE.Mesh(g, wallMat.clone());
+    const mesh = new THREE.Mesh(g, wallMat);
     mesh.position.set(mx, h/2, mz);
     mesh.rotation.y = rot;
     mesh.castShadow = true; mesh.receiveShadow = true;
@@ -1424,7 +1696,7 @@ function generateWallsFromRooms(rooms, tw, td, h, thick) {
         if (z2 - z1 > 0.5) {
           const sharedX = Math.abs(r1x2 - r2.x) < 0.3 ? r1x2 : r2x2;
           const g = new THREE.BoxGeometry(z2 - z1, h, thick);
-          const mesh = new THREE.Mesh(g, wallMat.clone());
+          const mesh = new THREE.Mesh(g, wallMat);
           mesh.position.set(sharedX, h/2, (z1 + z2)/2);
           mesh.rotation.y = Math.PI/2;
           mesh.castShadow = true; mesh.receiveShadow = true;
@@ -1436,7 +1708,7 @@ function generateWallsFromRooms(rooms, tw, td, h, thick) {
         if (x2 - x1 > 0.5) {
           const sharedZ = Math.abs(r1z2 - r2.z) < 0.3 ? r1z2 : r2z2;
           const g = new THREE.BoxGeometry(x2 - x1, h, thick);
-          const mesh = new THREE.Mesh(g, wallMat.clone());
+          const mesh = new THREE.Mesh(g, wallMat);
           mesh.position.set((x1 + x2)/2, h/2, sharedZ);
           mesh.castShadow = true; mesh.receiveShadow = true;
           state.wallsGroup.add(mesh);
@@ -1484,7 +1756,10 @@ function generateRoof(data, wallH, tw, td) {
   geom.setIndex(idx);
   geom.setAttribute('position', new THREE.BufferAttribute(verts, 3));
   geom.computeVertexNormals();
+  geom.computeBoundingBox();
+  geom.computeBoundingSphere();
   const roof = new THREE.Mesh(geom, roofMat);
+  roof.frustumCulled = false;
   roof.castShadow = true;
   roof.userData.kind = 'exterior'; // extérieur — auto-masqué selon caméra
   state.roofGroup.add(roof);
@@ -2527,6 +2802,7 @@ window.resetScene = () => {
   document.getElementById('room-selector').classList.add('hidden');
   document.getElementById('cmd-bar').classList.add('hidden');
   document.getElementById('stats').style.opacity = '0';
+  clearHistory();
   state.camera.position.set(8, 12, 14);
   state.controls.target.set(5, 0, 4);
   state.controls.update();
@@ -2543,6 +2819,8 @@ window.loadDemo = function() {
     .then(r => r.json())
     .then(json => {
       buildScene(json.model);
+      state.currentProjectId = null;
+      clearHistory();
       // Construire une analyse synthétique pour la commande IA depuis le modèle démo
       state._lastAnalysis = {
         rooms: json.model.rooms,
@@ -2588,6 +2866,8 @@ window.uploadFile = function(file) {
       if (json.analysis?.error) throw new Error(json.analysis.error);
       if (!json.analysis?.rooms?.length) throw new Error('Aucune pièce détectée dans ce plan');
       state.fileId = json.file_id;
+      state.currentProjectId = null;
+      clearHistory();
       state._lastAnalysis = json.analysis; // pour la commande IA
       showLoading('🏗️ Construction du modèle 3D...', `${json.analysis.rooms.length} pièces détectées`);
       return fetch('/api/build-3d', {
@@ -2661,6 +2941,7 @@ window.sendCommand = async function() {
       body: JSON.stringify({ analysis: json.analysis, file_id: state.fileId || 'modified' }),
     });
     const bj = await br.json();
+    pushHistory('Commande IA');
     buildScene(bj.model);
     inp.value = '';
     toast('✅ Modèle modifié — ' + text.slice(0, 60), 'success');
@@ -2807,6 +3088,7 @@ function loadRoomEdit() {
 window.applyRoomEdit = function() {
   const i = +document.getElementById('edit-room-select').value;
   const r = state.modelData.rooms[i];
+  pushHistory('Edition piece');
   r.name = document.getElementById('edit-name').value || r.name;
   r.width = +document.getElementById('edit-width').value || r.width;
   r.depth = +document.getElementById('edit-depth').value || r.depth;
@@ -2855,6 +3137,7 @@ setTimeout(() => {
 }, 8000);
 
 initScene();
+refreshCurrentUser();
 </script>
 </body>
 </html>

@@ -29,6 +29,56 @@ def test_demo_model_structure():
     assert model["floor"]["width"] > 0
 
 
+def test_auth_and_project_crud():
+    email = f"archi_{int(__import__('time').time() * 1000)}@example.com"
+    password = "motdepasse-solide"
+
+    r = client.get("/api/projects")
+    assert r.status_code == 401
+
+    r = client.post("/api/auth/register", json={"email": email, "password": password})
+    assert r.status_code == 200
+    assert r.json()["user"]["email"] == email
+
+    r = client.get("/api/auth/me")
+    assert r.status_code == 200
+    assert r.json()["user"]["email"] == email
+
+    demo = client.get("/api/demo-model").json()["model"]
+    r = client.post("/api/projects", json={"name": "Maison test", "model": demo})
+    assert r.status_code == 200
+    project = r.json()["project"]
+    assert project["name"] == "Maison test"
+    assert project["model"]["rooms"]
+
+    project_id = project["id"]
+    r = client.get("/api/projects")
+    assert r.status_code == 200
+    assert any(p["id"] == project_id for p in r.json()["projects"])
+
+    r = client.put(f"/api/projects/{project_id}", json={"name": "Maison test v2"})
+    assert r.status_code == 200
+    assert r.json()["project"]["name"] == "Maison test v2"
+
+    r = client.delete(f"/api/projects/{project_id}")
+    assert r.status_code == 200
+    r = client.get(f"/api/projects/{project_id}")
+    assert r.status_code == 404
+
+    r = client.post("/api/auth/logout")
+    assert r.status_code == 200
+    assert client.get("/api/auth/me").status_code == 401
+
+
+def test_auth_rejects_bad_credentials():
+    email = f"bad_{int(__import__('time').time() * 1000)}@example.com"
+    r = client.post("/api/auth/register", json={"email": email, "password": "123"})
+    assert r.status_code == 400
+
+    r = client.post("/api/auth/login", json={"email": email, "password": "mauvais"})
+    assert r.status_code == 401
+
+
 def test_build_3d_rejects_empty():
     r = client.post("/api/build-3d", json={})
     assert r.status_code == 400

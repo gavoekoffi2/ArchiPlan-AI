@@ -20,6 +20,9 @@ Télécharge une image de plan (PNG/JPG) → L'IA analyse → Modèle 3D génér
 | 🧠 **Analyse IA du plan** | Gemini Vision / GPT-4o / Claude analysent le plan et détectent automatiquement les pièces, murs, portes, fenêtres |
 | 🏠 **Génération 3D automatique** | Murs, sols, pièces colorées, portes, fenêtres — tout est généré en JSON structuré |
 | 🪑 **Meubles automatiques** | Placement intelligent selon le type de pièce (canapé/salon, lit/chambre, baignoire/SDB, cuisine...) |
+| 👤 **Comptes locaux** | Authentification email/mot de passe avec sessions HTTP-only |
+| 💾 **Mes projets** | Sauvegarde SQLite, liste, ouverture, mise à jour et suppression des projets |
+| ↶ **Annuler/Refaire** | Historique local des modifications de plan, boutons et raccourcis Ctrl+Z / Ctrl+Y |
 | 🖱️ **Vue orbite 3D** | Rotation, zoom, pan — clic sur une pièce pour zoomer |
 | 🚶 **Visite virtuelle FPS** | WASD + souris pour marcher dans la maison comme dans un jeu vidéo |
 | 🎨 **Code couleur par pièce** | Chaque pièce a sa couleur distincte pour une lisibilité immédiate |
@@ -104,6 +107,17 @@ pip install -r requirements.txt
 pytest tests/ -v
 ```
 
+Avant un commit de production, vérifier aussi la syntaxe du module JavaScript inline :
+
+```bash
+# PowerShell
+$html = Get-Content app\static\index.html -Raw
+$m = [regex]::Match($html, '<script type="module">(?<js>[\s\S]*?)</script>')
+Set-Content .tmp-index-module.js $m.Groups['js'].Value -Encoding UTF8
+node --check .tmp-index-module.js
+Remove-Item .tmp-index-module.js
+```
+
 ---
 
 ## 🏛️ Architecture
@@ -183,11 +197,11 @@ ArchiPlan-AI/
 
 ### Améliorations UI/UX
 
-1. **Sauvegarder/charger des projets** (localStorage ou backend)
-2. **Export OBJ/glTF/IFC** pour logiciels BIM
+1. **OAuth Google/GitHub** au-dessus de l'authentification locale
+2. **Export IFC** pour logiciels BIM
 3. **Partage de projet** par lien
 4. **Mode comparaison** (avant/après ameublement)
-5. **Responsive mobile** (vue simplifiée)
+5. **Responsive mobile avancé** (gestes tactiles dédiés, panneaux encore plus compacts)
 
 ### Améliorations techniques
 
@@ -205,7 +219,7 @@ ArchiPlan-AI/
 |-----|----------|-------------|
 | Modèles IA parfois lents (10-20s) | Moyenne | Timeout augmentable dans `call_openrouter()` |
 | Meubles déposés au centre si pas de pièce détectée | Basse | Ajouter placement contextuel |
-| Visite FPS peut traverser les murs | Moyenne | Ajouter collision detection (raycasting) |
+| Plans complexes parfois mal analysés | Haute | Ajouter validation géométrique et jeux de plans réels |
 | Couleurs de pièces pastel peu contrastées | Basse | Palette configurable dans `room_colors` |
 
 ---
@@ -246,8 +260,12 @@ claude
 | Variable | Requise | Description |
 |----------|---------|-------------|
 | `OPENROUTER_API_KEY` | Oui | Clé API OpenRouter (modèles vision) |
+| `ARCHIPLAN_RATE_LIMIT` | Non | Limite horaire par IP, `60` par défaut |
+| `ARCHIPLAN_PRICE_M2` | Non | Prix indicatif au m², `1800` par défaut |
 
 Le fichier `.env` dans `~/.hermes/.env` est chargé automatiquement.
+
+Les comptes et projets locaux sont stockés dans `app/output/archiplan.sqlite3` en SQLite.
 
 ---
 

@@ -1,11 +1,13 @@
 __pycache__/
 *.pyc
 *.zip
+.venv/
 .env
 *.log
 output/*.json
 uploads/*.png
 app/output/*.json
+app/output/*.sqlite3
 app/uploads/*
 app/logs/
 .pytest_cache/

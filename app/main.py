@@ -14,9 +14,12 @@ import os
 import json
 import base64
 import hashlib
+import hmac
 import logging
 import logging.handlers
 import re
+import secrets
+import sqlite3
 import time
 import math
 from collections import defaultdict, deque
@@ -25,7 +28,7 @@ from datetime import datetime
 from contextlib import asynccontextmanager
 from typing import Optional
 
-from fastapi import FastAPI, UploadFile, File, HTTPException, Request
+from fastapi import FastAPI, UploadFile, File, HTTPException, Request, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -39,6 +42,7 @@ OUTPUT = BASE_DIR / "output"
 STATIC = BASE_DIR / "static"
 LOGS = BASE_DIR / "logs"
 CACHE = OUTPUT / ".cache"
+DB_PATH = OUTPUT / "archiplan.sqlite3"
 
 for d in [UPLOADS, OUTPUT, LOGS, CACHE]:
     d.mkdir(exist_ok=True, parents=True)
@@ -92,12 +96,129 @@ MODELS = [
 ]
 MAX_UPLOAD_BYTES = 8 * 1024 * 1024  # 8 Mo
 RATE_LIMIT_PER_HOUR = int(os.environ.get("ARCHIPLAN_RATE_LIMIT", "60"))
+SESSION_COOKIE = "archiplan_session"
+SESSION_MAX_AGE = 60 * 60 * 24 * 30
+PASSWORD_ITERATIONS = 260_000
 
 # Prix indicatif au m² (peut être surchargé par l'environnement ARCHIPLAN_PRICE_M2)
 DEFAULT_PRICE_M2 = float(os.environ.get("ARCHIPLAN_PRICE_M2", "1800"))
 
+
+def db() -> sqlite3.Connection:
+    """Ouvre une connexion SQLite avec des lignes nommees."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
+    return conn
+
+
+def init_db() -> None:
+    """Prepare la base locale : utilisateurs, sessions et projets sauvegardes."""
+    with db() as conn:
+        conn.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                email TEXT NOT NULL UNIQUE,
+                password_hash TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS sessions (
+                token TEXT PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                created_at TEXT NOT NULL,
+                expires_at REAL NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS projects (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                name TEXT NOT NULL,
+                analysis_json TEXT,
+                model_json TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            """
+        )
+
+
+def normalize_email(email: str) -> str:
+    email = (email or "").strip().lower()
+    if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
+        raise HTTPException(400, "Adresse email invalide.")
+    return email
+
+
+def hash_password(password: str) -> str:
+    if not password or len(password) < 8:
+        raise HTTPException(400, "Le mot de passe doit contenir au moins 8 caracteres.")
+    salt = secrets.token_bytes(16)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, PASSWORD_ITERATIONS)
+    return f"pbkdf2_sha256${PASSWORD_ITERATIONS}${salt.hex()}${digest.hex()}"
+
+
+def verify_password(password: str, stored: str) -> bool:
+    try:
+        algo, iterations, salt_hex, digest_hex = stored.split("$", 3)
+        if algo != "pbkdf2_sha256":
+            return False
+        digest = hashlib.pbkdf2_hmac(
+            "sha256", password.encode(), bytes.fromhex(salt_hex), int(iterations)
+        )
+        return hmac.compare_digest(digest.hex(), digest_hex)
+    except Exception:
+        return False
+
+
+def public_user(row: sqlite3.Row) -> dict:
+    return {
+        "id": row["id"],
+        "email": row["email"],
+        "created_at": row["created_at"],
+    }
+
+
+def create_session(response: Response, user_id: int) -> None:
+    token = secrets.token_urlsafe(32)
+    now = time.time()
+    with db() as conn:
+        conn.execute(
+            "INSERT INTO sessions(token, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)",
+            (token, user_id, datetime.now().isoformat(), now + SESSION_MAX_AGE),
+        )
+    response.set_cookie(
+        SESSION_COOKIE,
+        token,
+        max_age=SESSION_MAX_AGE,
+        httponly=True,
+        samesite="lax",
+        secure=False,
+    )
+
+
+def current_user(request: Request) -> sqlite3.Row:
+    token = request.cookies.get(SESSION_COOKIE)
+    if not token:
+        raise HTTPException(401, "Connexion requise.")
+    with db() as conn:
+        row = conn.execute(
+            """
+            SELECT users.id, users.email, users.created_at
+            FROM sessions
+            JOIN users ON users.id = sessions.user_id
+            WHERE sessions.token = ? AND sessions.expires_at > ?
+            """,
+            (token, time.time()),
+        ).fetchone()
+    if not row:
+        raise HTTPException(401, "Session expiree. Reconnectez-vous.")
+    return row
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    init_db()
     logger.info("=" * 60)
     logger.info("ArchiPlan AI v%s démarré", app.version)
     logger.info("OpenRouter : %s", "configuré" if OPENROUTER_KEY else "MANQUANT")
@@ -116,6 +237,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+init_db()
 
 # Rate-limit en mémoire : { ip: deque[timestamps] }
 _rate_log: dict = defaultdict(lambda: deque(maxlen=RATE_LIMIT_PER_HOUR + 10))
@@ -144,6 +267,195 @@ async def health():
         "models": MODELS,
         "openrouter_configured": bool(OPENROUTER_KEY),
     }
+
+
+@app.post("/api/auth/register")
+async def register(payload: dict, response: Response):
+    """Cree un compte local et ouvre une session."""
+    email = normalize_email(payload.get("email", ""))
+    password_hash = hash_password(payload.get("password", ""))
+    now = datetime.now().isoformat()
+    try:
+        with db() as conn:
+            cur = conn.execute(
+                "INSERT INTO users(email, password_hash, created_at) VALUES (?, ?, ?)",
+                (email, password_hash, now),
+            )
+            user_id = cur.lastrowid
+            row = conn.execute(
+                "SELECT id, email, created_at FROM users WHERE id = ?", (user_id,)
+            ).fetchone()
+    except sqlite3.IntegrityError:
+        raise HTTPException(409, "Un compte existe deja avec cet email.")
+    create_session(response, int(user_id))
+    logger.info("Compte cree | user_id=%s | email=%s", user_id, email)
+    return {"status": "success", "user": public_user(row)}
+
+
+@app.post("/api/auth/login")
+async def login(payload: dict, response: Response):
+    """Connecte un utilisateur par email/mot de passe."""
+    email = normalize_email(payload.get("email", ""))
+    password = payload.get("password", "")
+    with db() as conn:
+        row = conn.execute(
+            "SELECT id, email, password_hash, created_at FROM users WHERE email = ?",
+            (email,),
+        ).fetchone()
+    if not row or not verify_password(password, row["password_hash"]):
+        raise HTTPException(401, "Email ou mot de passe incorrect.")
+    create_session(response, int(row["id"]))
+    logger.info("Connexion utilisateur | user_id=%s | email=%s", row["id"], email)
+    return {"status": "success", "user": public_user(row)}
+
+
+@app.post("/api/auth/logout")
+async def logout(request: Request, response: Response):
+    """Ferme la session courante."""
+    token = request.cookies.get(SESSION_COOKIE)
+    if token:
+        with db() as conn:
+            conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
+    response.delete_cookie(SESSION_COOKIE)
+    return {"status": "success"}
+
+
+@app.get("/api/auth/me")
+async def me(request: Request):
+    """Retourne l'utilisateur connecte."""
+    return {"status": "success", "user": public_user(current_user(request))}
+
+
+def serialize_project(row: sqlite3.Row, include_payload: bool = False) -> dict:
+    project = {
+        "id": row["id"],
+        "name": row["name"],
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+    }
+    if include_payload:
+        project["analysis"] = json.loads(row["analysis_json"]) if row["analysis_json"] else None
+        project["model"] = json.loads(row["model_json"])
+    return project
+
+
+@app.get("/api/projects")
+async def list_projects(request: Request):
+    """Liste les projets de l'utilisateur connecte."""
+    user = current_user(request)
+    with db() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, name, analysis_json, model_json, created_at, updated_at
+            FROM projects
+            WHERE user_id = ?
+            ORDER BY updated_at DESC
+            """,
+            (user["id"],),
+        ).fetchall()
+    return {"status": "success", "projects": [serialize_project(r) for r in rows]}
+
+
+@app.post("/api/projects")
+async def save_project(request: Request, payload: dict):
+    """Sauvegarde un projet utilisateur."""
+    user = current_user(request)
+    name = (payload.get("name") or "Projet ArchiPlan").strip()[:120]
+    model = payload.get("model")
+    if not isinstance(model, dict) or not model.get("rooms"):
+        raise HTTPException(400, "Modele 3D requis pour sauvegarder le projet.")
+    analysis = payload.get("analysis")
+    now = datetime.now().isoformat()
+    with db() as conn:
+        cur = conn.execute(
+            """
+            INSERT INTO projects(user_id, name, analysis_json, model_json, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                user["id"],
+                name,
+                json.dumps(analysis, ensure_ascii=False) if analysis else None,
+                json.dumps(model, ensure_ascii=False),
+                now,
+                now,
+            ),
+        )
+        row = conn.execute(
+            "SELECT id, name, analysis_json, model_json, created_at, updated_at FROM projects WHERE id = ?",
+            (cur.lastrowid,),
+        ).fetchone()
+    logger.info("Projet sauvegarde | user_id=%s | project_id=%s", user["id"], row["id"])
+    return {"status": "success", "project": serialize_project(row, include_payload=True)}
+
+
+@app.get("/api/projects/{project_id}")
+async def get_project(project_id: int, request: Request):
+    """Charge un projet sauvegarde."""
+    user = current_user(request)
+    with db() as conn:
+        row = conn.execute(
+            """
+            SELECT id, name, analysis_json, model_json, created_at, updated_at
+            FROM projects
+            WHERE id = ? AND user_id = ?
+            """,
+            (project_id, user["id"]),
+        ).fetchone()
+    if not row:
+        raise HTTPException(404, "Projet non trouve.")
+    return {"status": "success", "project": serialize_project(row, include_payload=True)}
+
+
+@app.put("/api/projects/{project_id}")
+async def update_project(project_id: int, request: Request, payload: dict):
+    """Met a jour le nom et/ou le contenu d'un projet."""
+    user = current_user(request)
+    fields = []
+    values = []
+    if "name" in payload:
+        fields.append("name = ?")
+        values.append((payload.get("name") or "Projet ArchiPlan").strip()[:120])
+    if "analysis" in payload:
+        fields.append("analysis_json = ?")
+        values.append(json.dumps(payload.get("analysis"), ensure_ascii=False))
+    if "model" in payload:
+        model = payload.get("model")
+        if not isinstance(model, dict) or not model.get("rooms"):
+            raise HTTPException(400, "Modele 3D invalide.")
+        fields.append("model_json = ?")
+        values.append(json.dumps(model, ensure_ascii=False))
+    if not fields:
+        raise HTTPException(400, "Aucune modification fournie.")
+    fields.append("updated_at = ?")
+    values.append(datetime.now().isoformat())
+    values.extend([project_id, user["id"]])
+    with db() as conn:
+        cur = conn.execute(
+            f"UPDATE projects SET {', '.join(fields)} WHERE id = ? AND user_id = ?",
+            values,
+        )
+        if cur.rowcount == 0:
+            raise HTTPException(404, "Projet non trouve.")
+        row = conn.execute(
+            "SELECT id, name, analysis_json, model_json, created_at, updated_at FROM projects WHERE id = ?",
+            (project_id,),
+        ).fetchone()
+    return {"status": "success", "project": serialize_project(row, include_payload=True)}
+
+
+@app.delete("/api/projects/{project_id}")
+async def delete_project(project_id: int, request: Request):
+    """Supprime un projet sauvegarde."""
+    user = current_user(request)
+    with db() as conn:
+        cur = conn.execute(
+            "DELETE FROM projects WHERE id = ? AND user_id = ?",
+            (project_id, user["id"]),
+        )
+    if cur.rowcount == 0:
+        raise HTTPException(404, "Projet non trouve.")
+    return {"status": "success"}
 
 
 @app.post("/api/analyze-plan")
