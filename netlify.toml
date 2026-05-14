@@ -1,0 +1,14 @@
+[build]
+  publish = "app/static"
+  command = ""
+
+[[redirects]]
+  from = "/api/*"
+  to = "http://76.13.129.252:9090/api/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
