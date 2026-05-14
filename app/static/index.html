@@ -795,7 +795,7 @@ function initScene() {
   // Pas de fog par défaut — la maison doit rester visible à toute distance
   state.scene.fog = null;
 
-  state.camera = new THREE.PerspectiveCamera(55, window.innerWidth/window.innerHeight, 0.05, 800);
+  state.camera = new THREE.PerspectiveCamera(55, window.innerWidth/window.innerHeight, 0.02, 2000);
   state.camera.position.set(8, 12, 14);
 
   state.controls = new OrbitControls(state.camera, state.renderer.domElement);
@@ -1442,6 +1442,9 @@ function onKeyDown(e) {
     redoChange();
     return;
   }
+  if (state.isWalkMode && ['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright','shift'].includes(e.key.toLowerCase())) {
+    e.preventDefault();
+  }
   state.walkKeys[e.key.toLowerCase()] = true;
   if (e.key === 'Escape') {
     if (_tourActive) finishCinematicTour();
@@ -1609,6 +1612,7 @@ function buildScene(data) {
 
   // Toit / plafond (caché par défaut)
   generateRoof(data, h, tw, td);
+  stabilizeModelVisibility();
 
   // Cadrage adaptatif : on calcule la BBOX RÉELLE des pièces
   // (et non pas total_width qui peut être faux/manquant)
@@ -1618,6 +1622,20 @@ function buildScene(data) {
 
   updateStats(data);
   updateRoomList(data);
+}
+
+function stabilizeModelVisibility() {
+  state.modelGroup.traverse(obj => {
+    if (obj.isMesh || obj.isLine || obj.isSprite) {
+      obj.frustumCulled = false;
+      obj.updateMatrixWorld(true);
+      obj.geometry?.computeBoundingBox?.();
+      obj.geometry?.computeBoundingSphere?.();
+    }
+  });
+  state.camera.near = 0.02;
+  state.camera.far = 2000;
+  state.camera.updateProjectionMatrix();
 }
 
 // Calcule la bounding box réelle du modèle (pièces + murs)
@@ -1784,6 +1802,9 @@ const FURN_DIM = {
   curtain:{w:1.4,d:0.1}, ceiling_lamp:{w:0.5,d:0.5},
   single_bed:{w:1.0,d:2.0}, crib:{w:1.3,d:0.7}, vanity:{w:1.1,d:0.5},
   toy_chest:{w:0.9,d:0.5}, armchair:{w:0.9,d:0.85}, shower:{w:0.9,d:0.9},
+  car:{w:2.0,d:4.2}, workbench:{w:1.8,d:0.75}, toolbox:{w:0.7,d:0.45}, storage_box:{w:0.8,d:0.6},
+  filing_cabinet:{w:0.55,d:0.55}, printer:{w:0.55,d:0.45}, conference_table:{w:3.0,d:1.2}, whiteboard:{w:1.7,d:0.08},
+  console:{w:1.1,d:0.35}, coat_rack:{w:0.45,d:0.45}, shoe_rack:{w:1.0,d:0.35}, towel_rack:{w:0.8,d:0.08},
 };
 
 // Placer un meuble contre un mur ('N'/'S'/'E'/'W') à une fraction t le long du mur (0..1).
@@ -1837,6 +1858,34 @@ function placeAtCenter(room, type, offsetX = 0, offsetZ = 0, rot = 0) {
   return placeFurniture(type, room.x + room.width/2 + offsetX, 0, room.z + room.depth/2 + offsetZ, rot);
 }
 
+function classifyRoom(room, idx, bedroomRank) {
+  const rawType = (room.type || '').toLowerCase();
+  const rawName = (room.name || '').toLowerCase();
+  const text = `${rawType} ${rawName}`;
+  if (/garage|parking|box/.test(text)) return 'garage';
+  if (/cuisine|kitchen/.test(text)) return 'kitchen';
+  if (/salon|living|s[eé]jour|sejour|lounge/.test(text)) return 'living';
+  if (/salle.*manger|dining|repas/.test(text)) return 'dining';
+  if (/bureau|office|study|travail/.test(text)) return 'office';
+  if (/r[eé]union|meeting|conference|conf[eé]rence/.test(text)) return 'meeting';
+  if (/sdb|bain|bath|salle.*eau|douche/.test(text)) return 'bathroom';
+  if (/(^|\s)wc(\s|$)|toilet|toilett/.test(text)) return 'wc';
+  if (/entr[eé]e|hall|couloir|corridor|vestibule/.test(text)) return 'hall';
+  if (/placard|rangement|d[eé]barras|storage|cellier/.test(text)) return 'storage';
+  if (/chambre|bedroom|suite|parent|enfant|b[eé]b[eé]|baby|guest|amis/.test(text)) {
+    if (/b[eé]b[eé]|baby|nursery/.test(text)) return 'baby_bedroom';
+    if (/enfant|child|kid/.test(text) || bedroomRank?.child === idx) return 'child_bedroom';
+    if (/amis|invit|guest/.test(text)) return 'guest_bedroom';
+    if (/principal|parent|master|suite/.test(text) || bedroomRank?.master === idx) return 'master_bedroom';
+    return 'bedroom';
+  }
+  const area = (room.width || 0) * (room.depth || 0);
+  if (area >= 18) return 'living';
+  if (area >= 9) return 'bedroom';
+  if (area <= 3.5) return 'wc';
+  return 'storage';
+}
+
 function autoPlaceFurniture(rooms) {
   // Pré-classement des chambres : la plus grande = principale, la plus petite = enfant
   const bedroomIndices = rooms
@@ -1856,16 +1905,19 @@ function autoPlaceFurniture(rooms) {
     const area = room.width * room.depth;
     const type = (room.type || '').toLowerCase();
     const name = (room.name || '').toLowerCase();
-    const isLiving = type === 'living' || /salon|living|sejour|séjour/.test(name);
-    const isKitchen = type === 'kitchen' || /cuisin|kitchen/.test(name);
-    const isBedroom = type === 'bedroom' || /chambre|bedroom|chamb/.test(name);
-    const isBathroom = type === 'bathroom' || /sdb|bain|salle.*eau|bath/.test(name);
-    const isWC = type === 'wc' || /^wc$|toilett|^toilet$/.test(name);
-    const isOffice = type === 'office' || /bureau|office/.test(name);
-    const isDining = type === 'dining' || /repas|dining|salle.*manger/.test(name);
-    const isHall = type === 'hallway' || type === 'entrance' || /entr.e|couloir|hall/.test(name);
-    const isStorage = type === 'storage' || /placard|rangement|debarras/.test(name);
-    const isGarage = type === 'garage' || /garage/.test(name);
+    const roomKind = classifyRoom(room, idx, bedroomRank);
+    room.userData = { ...(room.userData || {}), inferredType: roomKind };
+    const isLiving = roomKind === 'living';
+    const isKitchen = roomKind === 'kitchen';
+    const isBedroom = /bedroom/.test(roomKind);
+    const isBathroom = roomKind === 'bathroom';
+    const isWC = roomKind === 'wc';
+    const isOffice = roomKind === 'office';
+    const isMeeting = roomKind === 'meeting';
+    const isDining = roomKind === 'dining';
+    const isHall = roomKind === 'hall';
+    const isStorage = roomKind === 'storage';
+    const isGarage = roomKind === 'garage';
 
     // Le mur LONG (plus long côté) et son mur opposé
     const longSideWall = room.width >= room.depth ? 'S' : 'E';
@@ -1876,17 +1928,20 @@ function autoPlaceFurniture(rooms) {
     let placed = 0;
     const tryPlace = (...args) => { if (placeAgainstWall(...args)) placed++; };
     const tryCenter = (...args) => { if (placeAtCenter(...args)) placed++; };
+    const direct = (type, x, z, rot = 0) => {
+      if (placeFurniture(type, room.x + x, 0, room.z + z, rot)) placed++;
+    };
 
     try {
       if (isBedroom) {
         // Détermine le SOUS-TYPE de chambre pour varier l'ameublement
-        const isMaster = /principal|parent|master|suite/.test(name) ||
+        const isMaster = roomKind === 'master_bedroom' || /principal|parent|master|suite/.test(name) ||
           // Sinon : la plus grande chambre est désignée comme principale
           (bedroomRank?.master === idx);
-        const isChild = /enfant|bebe|bébé|child|kid|baby|nursery/.test(name) ||
+        const isChild = roomKind === 'child_bedroom' || /enfant|bebe|bébé|child|kid|baby|nursery/.test(name) ||
           (bedroomRank?.child === idx);
-        const isBaby = /bebe|bébé|baby|nursery/.test(name);
-        const isGuest = /amis|invit|guest/.test(name);
+        const isBaby = roomKind === 'baby_bedroom' || /bebe|bébé|baby|nursery/.test(name);
+        const isGuest = roomKind === 'guest_bedroom' || /amis|invit|guest/.test(name);
 
         if (isBaby) {
           // CHAMBRE BÉBÉ : berceau + commode à langer + petit fauteuil
@@ -1992,32 +2047,61 @@ function autoPlaceFurniture(rooms) {
         }
       } else if (isBathroom) {
         tryPlace(room, longSideWall, 'bathtub', 0.5);
+        if (area > 5) tryPlace(room, perpWall2, 'shower', 0.18);
         tryPlace(room, perpWall, 'sink', 0.5);
         tryPlace(room, perpWall2, 'toilet', 0.5);
         tryPlace(room, perpWall, 'mirror', 0.5);
+        tryPlace(room, longSideWall, 'towel_rack', 0.92);
       } else if (isWC) {
         tryPlace(room, oppWall, 'toilet', 0.5);
         if (area > 2) tryPlace(room, longSideWall, 'sink', 0.5);
       } else if (isOffice) {
         tryPlace(room, oppWall, 'desk', 0.5);
-        if (perpWall === 'W') placeFurniture('chair', room.x + 0.7 + 0.6, 0, room.z + room.depth/2, -Math.PI/2);
-        else placeFurniture('chair', room.x + room.width/2, 0, room.z + 0.7 + 0.6, 0);
+        if (perpWall === 'W') direct('chair', 1.3, room.depth/2, -Math.PI/2);
+        else direct('chair', room.width/2, 1.3, 0);
         tryPlace(room, longSideWall, 'bookshelf', 0.3);
+        tryPlace(room, longSideWall, 'filing_cabinet', 0.75);
+        if (area > 7) tryPlace(room, perpWall, 'printer', 0.25);
         if (area > 8) tryPlace(room, longSideWall, 'plant', 0.9);
         tryPlace(room, perpWall2, 'painting', 0.5);
+      } else if (isMeeting) {
+        placeAtCenter(room, 'conference_table');
+        tryPlace(room, oppWall, 'whiteboard', 0.5);
+        tryPlace(room, longSideWall, 'printer', 0.15);
+        const cx = room.width/2, cz = room.depth/2;
+        direct('chair', cx - 1.35, cz - 0.35, -Math.PI/2);
+        direct('chair', cx - 1.35, cz + 0.35, -Math.PI/2);
+        direct('chair', cx + 1.35, cz - 0.35, Math.PI/2);
+        direct('chair', cx + 1.35, cz + 0.35, Math.PI/2);
+        if (area > 16) {
+          direct('chair', cx - 0.45, cz - 0.9, 0);
+          direct('chair', cx + 0.45, cz - 0.9, 0);
+        }
       } else if (isDining) {
-        placeAtCenter(room, 'dining_table');
-        const cx = room.x + room.width/2, cz = room.z + room.depth/2;
-        placeFurniture('chair', cx - 0.9, 0, cz, -Math.PI/2);
-        placeFurniture('chair', cx + 0.9, 0, cz, Math.PI/2);
-        placeFurniture('chair', cx, 0, cz - 0.7, 0);
-        placeFurniture('chair', cx, 0, cz + 0.7, Math.PI);
+        tryCenter(room, 'dining_table');
+        const cx = room.width/2, cz = room.depth/2;
+        direct('chair', cx - 0.9, cz, -Math.PI/2);
+        direct('chair', cx + 0.9, cz, Math.PI/2);
+        direct('chair', cx, cz - 0.7, 0);
+        direct('chair', cx, cz + 0.7, Math.PI);
         if (area > 12) tryPlace(room, oppWall, 'plant', 0.05);
       } else if (isHall) {
-        if (area > 3) tryPlace(room, oppWall, 'plant', 0.95);
-        if (area > 6) tryPlace(room, longSideWall, 'painting', 0.5);
-      } else if (isStorage || isGarage) {
-        tryPlace(room, oppWall, 'bookshelf', 0.5);
+        tryPlace(room, oppWall, 'console', 0.45);
+        tryPlace(room, longSideWall, 'shoe_rack', 0.25);
+        tryPlace(room, longSideWall, 'coat_rack', 0.85);
+        if (area > 5) tryPlace(room, perpWall2, 'mirror', 0.5);
+      } else if (isGarage) {
+        if (area > 11) {
+          direct('car', room.width/2, room.depth/2, room.width >= room.depth ? 0 : Math.PI/2);
+        }
+        tryPlace(room, longSideWall, 'workbench', 0.5);
+        tryPlace(room, oppWall, 'toolbox', 0.2);
+        tryPlace(room, oppWall, 'storage_box', 0.75);
+        tryPlace(room, perpWall, 'bookshelf', 0.5);
+      } else if (isStorage) {
+        tryPlace(room, oppWall, 'bookshelf', 0.35);
+        tryPlace(room, oppWall, 'storage_box', 0.75);
+        if (area > 5) tryPlace(room, longSideWall, 'toolbox', 0.5);
       } else {
         // Inconnu — heuristique sur la surface
         if (area < 4) tryPlace(room, oppWall, 'toilet', 0.5);
@@ -2594,6 +2678,112 @@ function createFurnitureMesh(type) {
       group.add(mk(0.55, 0.78, 0.02, new THREE.MeshStandardMaterial({color:'#d0d8e0',roughness:.3,metalness:.4}), 0, 0.425, 0.3));
       // poignée horizontale en haut
       group.add(mkCyl(0.015, 0.015, 0.5, metal, 0, 0.78, 0.31));
+      break;
+
+    case 'car': {
+      const body = new THREE.MeshStandardMaterial({ color:'#3b6ea8', roughness:.35, metalness:.25 });
+      const glassCar = new THREE.MeshStandardMaterial({ color:'#b9e4ff', transparent:true, opacity:.48, roughness:.05, metalness:.15 });
+      group.add(rmk(1.9, 0.45, 3.8, body, 0, 0.38, 0, 0.12));
+      group.add(rmk(1.35, 0.55, 1.45, body, 0, 0.85, -0.15, 0.12));
+      group.add(mk(1.12, 0.34, 0.04, glassCar, 0, 0.96, -0.9));
+      group.add(mk(1.12, 0.34, 0.04, glassCar, 0, 0.96, 0.55));
+      group.add(mk(0.04, 0.32, 0.9, glassCar, -0.7, 0.95, -0.15));
+      group.add(mk(0.04, 0.32, 0.9, glassCar, 0.7, 0.95, -0.15));
+      [-0.82, 0.82].forEach(x => [-1.35, 1.35].forEach(z => {
+        const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.18, 28), dark);
+        wheel.rotation.z = Math.PI/2;
+        wheel.position.set(x, 0.28, z);
+        group.add(wheel);
+      }));
+      const headlight = new THREE.MeshStandardMaterial({color:'#fff6bf',emissive:'#fff2aa',emissiveIntensity:.5});
+      group.add(mk(0.35, 0.12, 0.05, headlight, -0.45, 0.48, -1.93));
+      group.add(mk(0.35, 0.12, 0.05, headlight, 0.45, 0.48, -1.93));
+      break;
+    }
+
+    case 'workbench':
+      group.add(rmk(1.8, 0.12, 0.72, wood, 0, 0.82, 0, 0.03));
+      [-0.75, 0.75].forEach(x => [-0.25, 0.25].forEach(z => group.add(mk(0.08, 0.75, 0.08, wood, x, 0.38, z))));
+      group.add(mk(1.65, 0.9, 0.05, new THREE.MeshStandardMaterial({color:'#7b6b55',roughness:.8}), 0, 1.25, -0.38));
+      group.add(mk(0.28, 0.16, 0.18, metal, -0.55, 0.98, 0.05));
+      [-0.45, -0.15, 0.18, 0.48].forEach(x => group.add(mk(0.05, 0.28, 0.03, dark, x, 1.28, -0.43)));
+      break;
+
+    case 'toolbox':
+      group.add(rmk(0.7, 0.32, 0.42, new THREE.MeshStandardMaterial({color:'#c0392b',roughness:.45,metalness:.15}), 0, 0.16, 0, 0.04));
+      group.add(mk(0.62, 0.03, 0.03, metal, 0, 0.34, -0.02));
+      group.add(mkCyl(0.02, 0.02, 0.42, metal, 0, 0.42, 0));
+      break;
+
+    case 'storage_box':
+      group.add(rmk(0.78, 0.5, 0.58, new THREE.MeshStandardMaterial({color:'#b8874b',roughness:.9}), 0, 0.25, 0, 0.025));
+      group.add(mk(0.8, 0.02, 0.6, new THREE.MeshStandardMaterial({color:'#8f6538',roughness:.9}), 0, 0.51, 0));
+      group.add(mk(0.08, 0.52, 0.02, dark, -0.18, 0.26, 0.31));
+      group.add(mk(0.08, 0.52, 0.02, dark, 0.18, 0.26, 0.31));
+      break;
+
+    case 'filing_cabinet':
+      group.add(rmk(0.55, 1.1, 0.55, new THREE.MeshStandardMaterial({color:'#b9c0c8',roughness:.45,metalness:.35}), 0, 0.55, 0, 0.025));
+      [-0.25, 0.05, 0.35].forEach(y => {
+        group.add(mk(0.48, 0.02, 0.02, dark, 0, 0.55 + y, 0.29));
+        group.add(mk(0.18, 0.025, 0.02, metal, 0, 0.6 + y, 0.31));
+      });
+      break;
+
+    case 'printer':
+      group.add(rmk(0.55, 0.22, 0.42, white, 0, 0.18, 0, 0.035));
+      group.add(mk(0.45, 0.03, 0.22, dark, 0, 0.31, -0.05));
+      group.add(mk(0.42, 0.02, 0.32, new THREE.MeshStandardMaterial({color:'#e9e9e9'}), 0, 0.08, 0.22));
+      break;
+
+    case 'conference_table':
+      group.add(rmk(3.0, 0.12, 1.2, wood, 0, 0.74, 0, 0.08));
+      [-1.15, 1.15].forEach(x => [-0.38, 0.38].forEach(z => group.add(mk(0.12, 0.68, 0.12, wood, x, 0.35, z))));
+      const confGlass = new THREE.MeshStandardMaterial({color:'#cfe4ee',transparent:true,opacity:.55,roughness:.05});
+      [-0.9, -0.3, 0.3, 0.9].forEach(x => {
+        group.add(mk(0.32, 0.015, 0.22, new THREE.MeshStandardMaterial({color:'#f4f1e8'}), x, 0.82, -0.18));
+        group.add(mkCyl(0.035, 0.03, 0.12, confGlass, x, 0.88, 0.22));
+      });
+      break;
+
+    case 'whiteboard':
+      group.add(mk(1.7, 1.0, 0.035, new THREE.MeshStandardMaterial({color:'#f7f8fb',roughness:.25}), 0, 1.25, 0));
+      group.add(mk(1.78, 0.04, 0.04, metal, 0, 1.78, 0.03));
+      group.add(mk(1.78, 0.04, 0.04, metal, 0, 0.72, 0.03));
+      group.add(mk(0.35, 0.025, 0.025, new THREE.MeshStandardMaterial({color:'#2d6cdf'}), -0.35, 0.78, 0.06));
+      group.add(mk(0.35, 0.025, 0.025, new THREE.MeshStandardMaterial({color:'#e74c3c'}), 0.1, 0.78, 0.06));
+      break;
+
+    case 'console':
+      group.add(rmk(1.1, 0.12, 0.35, wood, 0, 0.72, 0, 0.04));
+      [-0.45, 0.45].forEach(x => group.add(mk(0.06, 0.65, 0.06, wood, x, 0.35, 0)));
+      group.add(mk(0.18, 0.04, 0.12, metal, -0.2, 0.82, 0.02));
+      group.add(mkCyl(0.08, 0.05, 0.22, new THREE.MeshStandardMaterial({color:'#5f8d4e'}), 0.25, 0.84, 0));
+      break;
+
+    case 'coat_rack':
+      group.add(mkCyl(0.025, 0.025, 1.75, wood, 0, 0.9, 0));
+      group.add(mkCyl(0.18, 0.12, 0.08, wood, 0, 0.04, 0));
+      [0, Math.PI/2, Math.PI, -Math.PI/2].forEach(a => {
+        const hook = mk(0.38, 0.035, 0.035, metal, Math.cos(a)*0.18, 1.55, Math.sin(a)*0.18);
+        hook.rotation.y = -a;
+        group.add(hook);
+      });
+      group.add(mk(0.26, 0.62, 0.06, new THREE.MeshStandardMaterial({color:'#3c4f66'}), 0.18, 1.05, 0));
+      break;
+
+    case 'shoe_rack':
+      [0.12, 0.36, 0.6].forEach(y => group.add(mk(1.0, 0.035, 0.35, wood, 0, y, 0)));
+      [-0.32, 0.0, 0.32].forEach(x => {
+        group.add(rmk(0.22, 0.08, 0.32, dark, x, 0.17, -0.03, 0.03));
+        group.add(rmk(0.22, 0.08, 0.32, new THREE.MeshStandardMaterial({color:'#654321'}), x + 0.06, 0.41, 0.02, 0.03));
+      });
+      break;
+
+    case 'towel_rack':
+      group.add(mkCyl(0.02, 0.02, 0.8, metal, 0, 1.35, 0));
+      group.add(mk(0.32, 0.55, 0.025, new THREE.MeshStandardMaterial({color:'#6aa6d8',roughness:.8}), -0.18, 1.05, 0.02));
+      group.add(mk(0.32, 0.5, 0.025, new THREE.MeshStandardMaterial({color:'#f3d08a',roughness:.8}), 0.18, 1.02, 0.02));
       break;
 
     case 'curtain': {
