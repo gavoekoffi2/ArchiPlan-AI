@@ -1879,11 +1879,79 @@ function classifyRoom(room, idx, bedroomRank) {
     if (/principal|parent|master|suite/.test(text) || bedroomRank?.master === idx) return 'master_bedroom';
     return 'bedroom';
   }
-  const area = (room.width || 0) * (room.depth || 0);
-  if (area >= 18) return 'living';
-  if (area >= 9) return 'bedroom';
-  if (area <= 3.5) return 'wc';
-  return 'storage';
+  return 'unknown';
+}
+
+function inferRoomKinds(rooms, bedroomRank) {
+  const kinds = rooms.map((room, idx) => classifyRoom(room, idx, bedroomRank));
+  const byArea = rooms
+    .map((room, idx) => ({ idx, area: (room.width || 0) * (room.depth || 0) }))
+    .sort((a, b) => b.area - a.area);
+  const has = kind => kinds.includes(kind) || kinds.some(k => kind === 'bedroom' && /bedroom/.test(k));
+  const unknown = () => byArea.filter(o => kinds[o.idx] === 'unknown');
+
+  // Quand le plan ne nomme pas bien les pièces, on reconstruit un programme
+  // résidentiel plausible avant de meubler.
+  if (!has('living') && unknown()[0]) kinds[unknown()[0].idx] = 'living';
+  if (!has('kitchen') && unknown()[0]) {
+    const kitchenCandidate = unknown().find(o => o.area >= 5 && o.area <= 16) || unknown()[0];
+    if (kitchenCandidate) kinds[kitchenCandidate.idx] = 'kitchen';
+  }
+  if (!has('bathroom') && unknown()[0]) {
+    const bathCandidate = unknown().slice().reverse().find(o => o.area >= 3.5 && o.area <= 8);
+    if (bathCandidate) kinds[bathCandidate.idx] = 'bathroom';
+  }
+  if (!has('wc') && unknown()[0]) {
+    const wcCandidate = unknown().slice().reverse().find(o => o.area <= 3.8);
+    if (wcCandidate) kinds[wcCandidate.idx] = 'wc';
+  }
+
+  const bedroomUnknown = unknown().filter(o => o.area >= 7);
+  bedroomUnknown.forEach((o, n) => {
+    if (n === 0) kinds[o.idx] = 'master_bedroom';
+    else if (n === bedroomUnknown.length - 1 && bedroomUnknown.length > 1) kinds[o.idx] = 'child_bedroom';
+    else kinds[o.idx] = 'bedroom';
+  });
+  unknown().forEach(o => { kinds[o.idx] = o.area < 5 ? 'storage' : 'office'; });
+  return kinds;
+}
+
+const ROOM_KIND_LABELS = {
+  living: 'Salon',
+  kitchen: 'Cuisine',
+  dining: 'Salle à manger',
+  master_bedroom: 'Chambre parentale',
+  child_bedroom: 'Chambre enfant',
+  baby_bedroom: 'Chambre bébé',
+  guest_bedroom: "Chambre d'amis",
+  bedroom: 'Chambre',
+  bathroom: 'Salle de bain',
+  wc: 'WC',
+  office: 'Bureau',
+  meeting: 'Salle de réunion',
+  hall: 'Entrée / couloir',
+  storage: 'Rangement',
+  garage: 'Garage',
+  unknown: 'Pièce'
+};
+
+const ROOM_FURNITURE_LABELS = {
+  living: ['canapé', 'TV', 'table basse', 'bibliothèque', 'tapis', 'plantes'],
+  kitchen: ['bloc cuisine', 'frigo', 'four', 'évier', 'lave-vaisselle', 'micro-ondes'],
+  dining: ['table à manger', 'chaises', 'plante'],
+  master_bedroom: ['lit double', '2 chevets', 'armoire', 'commode', 'coiffeuse', 'miroir'],
+  child_bedroom: ['lit simple', 'bureau', 'coffre à jouets', 'armoire', 'étagère'],
+  baby_bedroom: ['berceau', 'commode', 'fauteuil', 'coffre à jouets'],
+  guest_bedroom: ['lit double', 'chevet', 'armoire', 'fauteuil'],
+  bedroom: ['lit', 'chevets', 'armoire', 'commode', 'miroir'],
+  bathroom: ['baignoire/douche', 'lavabo', 'WC', 'miroir', 'porte-serviettes'],
+  wc: ['WC', 'petit lavabo'],
+  office: ['bureau', 'chaise', 'bibliothèque', 'classeur', 'imprimante'],
+  meeting: ['table de conférence', 'chaises', 'tableau blanc', 'imprimante'],
+  hall: ['console', 'porte-manteau', 'meuble à chaussures', 'miroir'],
+  storage: ['étagères', 'cartons', 'boîte à outils'],
+  garage: ['voiture', 'établi', 'boîte à outils', 'cartons', 'étagères']
+};
 }
 
 function autoPlaceFurniture(rooms) {
@@ -1900,12 +1968,16 @@ function autoPlaceFurniture(rooms) {
     master: bedroomIndices[0]?.i,
     child: bedroomIndices.length >= 2 ? bedroomIndices[bedroomIndices.length - 1].i : undefined,
   };
+  const inferredKinds = inferRoomKinds(rooms, bedroomRank);
 
   rooms.forEach((room, idx) => {
     const area = room.width * room.depth;
     const type = (room.type || '').toLowerCase();
     const name = (room.name || '').toLowerCase();
-    const roomKind = classifyRoom(room, idx, bedroomRank);
+    const roomKind = inferredKinds[idx] || classifyRoom(room, idx, bedroomRank);
+    room.inferred_type = roomKind;
+    room.inferred_label = ROOM_KIND_LABELS[roomKind] || ROOM_KIND_LABELS.unknown;
+    room.furniture_plan = ROOM_FURNITURE_LABELS[roomKind] || [];
     room.userData = { ...(room.userData || {}), inferredType: roomKind };
     const isLiving = roomKind === 'living';
     const isKitchen = roomKind === 'kitchen';
@@ -2882,11 +2954,14 @@ function updateRoomList(data) {
   list.innerHTML = '';
   (data.rooms || []).forEach((room, i) => {
     const color = room.color || COLORS[i % COLORS.length];
+    const inferred = room.inferred_label || ROOM_KIND_LABELS[room.inferred_type] || room.type || 'Pièce';
+    const plan = (room.furniture_plan || []).slice(0, 6).join(', ');
     const d = document.createElement('div');
     d.className = 'room-item';
     d.innerHTML = `<div class="room-color" style="background:${color}"></div>
-      <div class="room-name">${escapeHtml(room.name || 'Pièce ' + (i+1))}
+      <div class="room-name">${escapeHtml(room.name || 'Pièce ' + (i+1))} <span style="color:var(--a2);font-size:10px">· ${escapeHtml(inferred)}</span>
         <div class="room-dim">${(room.width||0).toFixed(1)}×${(room.depth||0).toFixed(1)} m · ${((room.width||0)*(room.depth||0)).toFixed(1)} m²</div>
+        <div class="room-dim">${escapeHtml(plan || 'Mobilier adapté automatiquement')}</div>
       </div>`;
     d.onclick = e => { e.stopPropagation(); focusRoom(room); };
     list.appendChild(d);
@@ -2904,7 +2979,8 @@ function updateRoomList(data) {
     const o = document.createElement('option');
     o.value = String(i);
     const area = ((room.width||0)*(room.depth||0)).toFixed(1);
-    o.textContent = `${room.name || 'Pièce ' + (i+1)} (${area} m²)`;
+    const inferred = room.inferred_label || ROOM_KIND_LABELS[room.inferred_type] || room.type || 'Pièce';
+    o.textContent = `${room.name || 'Pièce ' + (i+1)} · ${inferred} (${area} m²)`;
     sel.appendChild(o);
   });
 }

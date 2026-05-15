@@ -629,7 +629,9 @@ OBJECTIF : analyser RIGOUREUSEMENT le plan visible dans l'image et produire un J
 ÉTAPES À SUIVRE MENTALEMENT :
 1. Identifie l'orientation et l'échelle visible (cotes, légende, mètres ou cm).
 2. Repère le contour extérieur du bâtiment et estime sa largeur/profondeur en mètres.
-3. Repère chaque pièce comme un rectangle approximatif (nom + position + dimensions).
+3. Repère chaque pièce comme un rectangle approximatif (nom + fonction + position + dimensions).
+   La fonction est capitale : distingue salon, cuisine, garage, bureau, chambre parentale,
+   chambre enfant, salle de bain, WC, entrée, rangement, salle à manger, salle de réunion.
 4. Trace les murs comme segments (x1,z1)→(x2,z2) en mètres.
 5. Repère les portes (ouvertures avec arc) et fenêtres (ouvertures dans murs extérieurs).
 6. Si tu vois des cotes, utilise-les ; sinon estime par proportions.
@@ -657,7 +659,9 @@ FORMAT DE SORTIE (JSON STRICT, RIEN D'AUTRE) :
   "floor_count": 1
 }
 
-TYPES DE PIÈCES VALIDES : "living", "kitchen", "bedroom", "bathroom", "wc", "office", "hallway", "entrance", "storage", "garage", "dining", "other".
+TYPES DE PIÈCES VALIDES : "living", "kitchen", "bedroom", "bathroom", "wc", "office", "hallway", "entrance", "storage", "garage", "dining", "meeting", "other".
+Pour les chambres, garde "type": "bedroom" et mets un nom clair si visible ou probable :
+"Chambre parentale", "Chambre enfant", "Chambre bébé", "Chambre d'amis".
 
 RÈGLES STRICTES :
 - Coordonnées en mètres, origine = coin supérieur-gauche, axe x→droite, z→bas.
@@ -665,6 +669,8 @@ RÈGLES STRICTES :
 - Hauteur par défaut 2.7 m (n'apparaît pas dans la sortie).
 - Portes : width entre 0.7 et 1.0 m, rotation 0 (horizontale) ou 1.5708 (verticale).
 - Fenêtres : width entre 0.6 et 2.0 m.
+- Nomme chaque pièce selon sa fonction architecturale réelle. Si le plan ne donne pas de nom,
+  déduis la fonction par taille, position, accès, symboles sanitaires/cuisine/garage et cohérence de maison.
 - ANALYSE RÉELLEMENT le plan — n'invente pas une maison générique.
 - Si l'image n'est PAS un plan d'architecture (photo, schéma autre), retourne : {"error": "not_a_floor_plan"}.
 - Retourne UNIQUEMENT le JSON, sans markdown ```, sans commentaires, sans explication."""
