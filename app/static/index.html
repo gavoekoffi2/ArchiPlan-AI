@@ -1512,11 +1512,6 @@ function buildScene(data) {
   state.floorMesh.receiveShadow = true;
   state.modelGroup.add(state.floorMesh);
 
-  // PAS de sprite labels — ils étaient rendus avec depthTest:false donc
-  // toujours visibles au-dessus de la 3D. Quand l'utilisateur tournait la
-  // caméra, plusieurs sprites se superposaient et masquaient le bâtiment.
-  // Les pièces sont identifiables par : murs + meubles + dropdown bas.
-
   // Walls
   const wallMat = new THREE.MeshStandardMaterial({
     map: state.textures.wall, color: '#f5f0e8', roughness: 0.7,
@@ -1586,6 +1581,7 @@ function buildScene(data) {
 
   // Auto furniture
   autoPlaceFurniture(data.rooms || []);
+  addRoomLabels(data.rooms || []);
 
   // Lampes plafond auto — LIMITÉES à 4 PointLights pour ne pas dépasser
   // les limites WebGL (la plupart des GPU acceptent ~4-8 lights max).
@@ -1622,6 +1618,86 @@ function buildScene(data) {
 
   updateStats(data);
   updateRoomList(data);
+}
+
+function makeRoomLabelTexture(title, subtitle) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 192;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.86)';
+  roundRect(ctx, 18, 18, 476, 156, 22);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(17, 24, 39, 0.22)';
+  ctx.lineWidth = 4;
+  ctx.stroke();
+
+  ctx.fillStyle = '#111827';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = '700 42px system-ui, -apple-system, Segoe UI, sans-serif';
+  fitCanvasText(ctx, title, 448, 52, 96, 42, 24);
+
+  ctx.fillStyle = '#64748b';
+  ctx.font = '600 24px system-ui, -apple-system, Segoe UI, sans-serif';
+  fitCanvasText(ctx, subtitle, 420, 256, 137, 24, 16);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = Math.min(8, state.renderer?.capabilities?.getMaxAnisotropy?.() || 1);
+  return texture;
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+function fitCanvasText(ctx, text, maxWidth, x, y, startSize, minSize) {
+  const family = 'system-ui, -apple-system, Segoe UI, sans-serif';
+  const weight = startSize > 30 ? '700' : '600';
+  let size = startSize;
+  while (size > minSize && ctx.measureText(text).width > maxWidth) {
+    size -= 2;
+    ctx.font = `${weight} ${size}px ${family}`;
+  }
+  ctx.fillText(text, x, y);
+}
+
+function addRoomLabels(rooms) {
+  rooms.forEach((room, i) => {
+    if (!room || !isFinite(room.x) || !isFinite(room.z) || !isFinite(room.width) || !isFinite(room.depth)) return;
+    const title = room.name || room.inferred_label || `Pièce ${i + 1}`;
+    const subtitle = room.inferred_label && room.inferred_label !== title ? room.inferred_label : `${((room.width || 0) * (room.depth || 0)).toFixed(1)} m²`;
+    const texture = makeRoomLabelTexture(title, subtitle);
+    const labelW = Math.max(1.25, Math.min(room.width * 0.72, 2.25));
+    const labelH = labelW * 0.375;
+    const geom = new THREE.PlaneGeometry(labelW, labelH);
+    const mat = new THREE.MeshBasicMaterial({
+      map: texture,
+      transparent: true,
+      depthTest: true,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    const mesh = new THREE.Mesh(geom, mat);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.set(room.x + room.width / 2, 0.035, room.z + room.depth / 2);
+    mesh.userData = { room, roomLabel: true };
+    mesh.frustumCulled = false;
+    state.roomsGroup.add(mesh);
+  });
 }
 
 function stabilizeModelVisibility() {
@@ -1805,6 +1881,7 @@ const FURN_DIM = {
   car:{w:2.0,d:4.2}, workbench:{w:1.8,d:0.75}, toolbox:{w:0.7,d:0.45}, storage_box:{w:0.8,d:0.6},
   filing_cabinet:{w:0.55,d:0.55}, printer:{w:0.55,d:0.45}, conference_table:{w:3.0,d:1.2}, whiteboard:{w:1.7,d:0.08},
   console:{w:1.1,d:0.35}, coat_rack:{w:0.45,d:0.45}, shoe_rack:{w:1.0,d:0.35}, towel_rack:{w:0.8,d:0.08},
+  outdoor_table:{w:1.1,d:0.8}, outdoor_chair:{w:0.55,d:0.6}, lounge_chair:{w:0.75,d:1.55}, grill:{w:0.8,d:0.45},
 };
 
 // Placer un meuble contre un mur ('N'/'S'/'E'/'W') à une fraction t le long du mur (0..1).
@@ -1862,6 +1939,7 @@ function classifyRoom(room, idx, bedroomRank) {
   const rawType = (room.type || '').toLowerCase();
   const rawName = (room.name || '').toLowerCase();
   const text = `${rawType} ${rawName}`;
+  if (/terrasse|terrace|balcon|balcony|patio|veranda|v[eé]randa|deck/.test(text)) return 'terrace';
   if (/garage|parking|box/.test(text)) return 'garage';
   if (/cuisine|kitchen/.test(text)) return 'kitchen';
   if (/salon|living|s[eé]jour|sejour|lounge/.test(text)) return 'living';
@@ -1916,10 +1994,27 @@ function inferRoomKinds(rooms, bedroomRank) {
   return kinds;
 }
 
+function isGenericRoomName(name) {
+  const n = (name || '').trim().toLowerCase();
+  return !n || /^pi[èe]ce\s*\d*$/.test(n) || /^room\s*\d*$/.test(n) || /^local\s*\d*$/.test(n) ||
+    /^espace\s*\d*$/.test(n) || /^chambre\s*\d+$/.test(n) || /^bedroom\s*\d+$/.test(n);
+}
+
+function uniqueRoomName(base, usedNames) {
+  let name = base || 'Pièce';
+  let n = 2;
+  while (usedNames.has(name.toLowerCase())) {
+    name = `${base} ${n++}`;
+  }
+  usedNames.add(name.toLowerCase());
+  return name;
+}
+
 const ROOM_KIND_LABELS = {
   living: 'Salon',
   kitchen: 'Cuisine',
   dining: 'Salle à manger',
+  terrace: 'Terrasse',
   master_bedroom: 'Chambre parentale',
   child_bedroom: 'Chambre enfant',
   baby_bedroom: 'Chambre bébé',
@@ -1939,6 +2034,7 @@ const ROOM_FURNITURE_LABELS = {
   living: ['canapé', 'TV', 'table basse', 'bibliothèque', 'tapis', 'plantes'],
   kitchen: ['bloc cuisine', 'frigo', 'four', 'évier', 'lave-vaisselle', 'micro-ondes'],
   dining: ['table à manger', 'chaises', 'plante'],
+  terrace: ['table extérieure', 'chaises extérieures', 'transats', 'barbecue', 'plantes'],
   master_bedroom: ['lit double', '2 chevets', 'armoire', 'commode', 'coiffeuse', 'miroir'],
   child_bedroom: ['lit simple', 'bureau', 'coffre à jouets', 'armoire', 'étagère'],
   baby_bedroom: ['berceau', 'commode', 'fauteuil', 'coffre à jouets'],
@@ -1968,6 +2064,7 @@ function autoPlaceFurniture(rooms) {
     child: bedroomIndices.length >= 2 ? bedroomIndices[bedroomIndices.length - 1].i : undefined,
   };
   const inferredKinds = inferRoomKinds(rooms, bedroomRank);
+  const usedNames = new Set();
 
   rooms.forEach((room, idx) => {
     const area = room.width * room.depth;
@@ -1977,6 +2074,11 @@ function autoPlaceFurniture(rooms) {
     room.inferred_type = roomKind;
     room.inferred_label = ROOM_KIND_LABELS[roomKind] || ROOM_KIND_LABELS.unknown;
     room.furniture_plan = ROOM_FURNITURE_LABELS[roomKind] || [];
+    if (isGenericRoomName(room.name)) {
+      room.name = uniqueRoomName(room.inferred_label, usedNames);
+    } else {
+      usedNames.add(String(room.name).toLowerCase());
+    }
     room.userData = { ...(room.userData || {}), inferredType: roomKind };
     const isLiving = roomKind === 'living';
     const isKitchen = roomKind === 'kitchen';
@@ -1986,6 +2088,7 @@ function autoPlaceFurniture(rooms) {
     const isOffice = roomKind === 'office';
     const isMeeting = roomKind === 'meeting';
     const isDining = roomKind === 'dining';
+    const isTerrace = roomKind === 'terrace';
     const isHall = roomKind === 'hall';
     const isStorage = roomKind === 'storage';
     const isGarage = roomKind === 'garage';
@@ -2156,6 +2259,15 @@ function autoPlaceFurniture(rooms) {
         direct('chair', cx, cz - 0.7, 0);
         direct('chair', cx, cz + 0.7, Math.PI);
         if (area > 12) tryPlace(room, oppWall, 'plant', 0.05);
+      } else if (isTerrace) {
+        tryCenter(room, 'outdoor_table');
+        const cx = room.width/2, cz = room.depth/2;
+        direct('outdoor_chair', cx - 0.85, cz, -Math.PI/2);
+        direct('outdoor_chair', cx + 0.85, cz, Math.PI/2);
+        if (area > 8) direct('lounge_chair', Math.max(0.7, room.width * 0.22), Math.max(0.9, room.depth * 0.72), Math.PI);
+        if (area > 10) direct('grill', room.width - 0.7, Math.min(room.depth - 0.55, 0.75), -Math.PI/2);
+        tryPlace(room, oppWall, 'plant', 0.12);
+        if (area > 7) tryPlace(room, oppWall, 'plant', 0.88);
       } else if (isHall) {
         tryPlace(room, oppWall, 'console', 0.45);
         tryPlace(room, longSideWall, 'shoe_rack', 0.25);
@@ -2855,6 +2967,35 @@ function createFurnitureMesh(type) {
       group.add(mkCyl(0.02, 0.02, 0.8, metal, 0, 1.35, 0));
       group.add(mk(0.32, 0.55, 0.025, new THREE.MeshStandardMaterial({color:'#6aa6d8',roughness:.8}), -0.18, 1.05, 0.02));
       group.add(mk(0.32, 0.5, 0.025, new THREE.MeshStandardMaterial({color:'#f3d08a',roughness:.8}), 0.18, 1.02, 0.02));
+      break;
+
+    case 'outdoor_table':
+      group.add(rmk(1.1, 0.08, 0.8, new THREE.MeshStandardMaterial({color:'#8b6b42',roughness:.85}), 0, 0.72, 0, 0.04));
+      group.add(mkCyl(0.05, 0.07, 0.65, metal, 0, 0.36, 0));
+      group.add(mkCyl(0.36, 0.28, 0.04, metal, 0, 0.04, 0));
+      group.add(mkCyl(0.03, 0.03, 1.1, new THREE.MeshStandardMaterial({color:'#d8d0c0'}), 0, 1.22, 0));
+      break;
+
+    case 'outdoor_chair':
+      group.add(rmk(0.55, 0.08, 0.55, new THREE.MeshStandardMaterial({color:'#4f8f7b',roughness:.75}), 0, 0.42, 0.06, 0.035));
+      group.add(rmk(0.55, 0.62, 0.08, new THREE.MeshStandardMaterial({color:'#4f8f7b',roughness:.75}), 0, 0.76, -0.22, 0.035));
+      [-0.2, 0.2].forEach(x => [-0.16, 0.24].forEach(z => group.add(mk(0.04, 0.42, 0.04, metal, x, 0.22, z))));
+      break;
+
+    case 'lounge_chair':
+      group.add(rmk(0.72, 0.08, 1.15, new THREE.MeshStandardMaterial({color:'#d7c28f',roughness:.8}), 0, 0.28, 0.15, 0.04));
+      const back = rmk(0.72, 0.08, 0.75, new THREE.MeshStandardMaterial({color:'#d7c28f',roughness:.8}), 0, 0.55, -0.45, 0.04);
+      back.rotation.x = -0.55;
+      group.add(back);
+      [-0.28, 0.28].forEach(x => group.add(mk(0.04, 0.25, 1.3, metal, x, 0.14, 0.1)));
+      break;
+
+    case 'grill':
+      group.add(rmk(0.8, 0.45, 0.42, new THREE.MeshStandardMaterial({color:'#202020',roughness:.35,metalness:.4}), 0, 0.75, 0, 0.05));
+      group.add(mk(0.7, 0.03, 0.36, metal, 0, 0.98, 0));
+      [-0.22, 0.22].forEach(x => group.add(mkCyl(0.035, 0.035, 0.65, metal, x, 0.35, 0.12)));
+      group.add(mk(0.18, 0.08, 0.12, new THREE.MeshStandardMaterial({color:'#c0392b'}), -0.22, 0.79, 0.24));
+      group.add(mk(0.18, 0.08, 0.12, new THREE.MeshStandardMaterial({color:'#f39c12'}), 0.22, 0.79, 0.24));
       break;
 
     case 'curtain': {
